@@ -30,7 +30,7 @@ const getChecklistIcon = (type: ChecklistItem['icon']) => {
     }
 };
 
-export const renderModuleToHtml = (module: ModuleData, prevModuleType?: ModuleType, nextModuleType?: ModuleType): string => {
+export const renderModuleToHtml = (module: ModuleData, prevModuleType?: ModuleType, nextModuleType?: ModuleType, firstBannerColor: string = '#0078DC'): string => {
     const { type, properties, id } = module;
     let content = '';
 
@@ -152,7 +152,7 @@ export const renderModuleToHtml = (module: ModuleData, prevModuleType?: ModuleTy
             const gridColor = '#E0E0E0';
             const phaseCells = phases.map((p, idx) => {
                 const isActive = p === properties.selectedPhase;
-                const bg = isActive ? '#0078DC' : '#f2f2f2';
+                const bg = isActive ? firstBannerColor : '#f2f2f2';
                 const color = isActive ? '#ffffff' : '#999999';
                 const weight = isActive ? 'bold' : 'normal';
                 const borderStyle = idx === phases.length - 1 ? '' : `border-right: 1px solid ${gridColor};`;
@@ -259,10 +259,13 @@ export const generateFullHtml = (modules: ModuleData[], isDarkMode: boolean = fa
     const insideModules = modules.filter(m => m.section === 'inside');
     const outsideModules = modules.filter(m => m.section === 'outside');
 
+    // Find the first banner's color to use as the primary brand color for synchronizing Delivery Phase
+    const firstBannerColor = modules.find(m => m.type === ModuleType.BANNER)?.properties.color || '#0078DC';
+
     const renderList = (list: ModuleData[]) => list.map((m, idx) => {
         const prevModuleType = list[idx - 1]?.type;
         const nextModuleType = list[idx + 1]?.type;
-        return renderModuleToHtml(m, prevModuleType, nextModuleType);
+        return renderModuleToHtml(m, prevModuleType, nextModuleType, firstBannerColor);
     }).join('\n');
 
     const insideHtml = renderList(insideModules);
@@ -287,8 +290,8 @@ export const generateFullHtml = (modules: ModuleData[], isDarkMode: boolean = fa
             color: #0078DC !important;
         }
 
-        /* Banners & Highlights (Enforced #0078DC) */
-        .banner-bg, .phase-active { background-color: #0078DC !important; }
+        /* Banners & Highlights (Enforced dynamically based on first banner) */
+        .banner-bg, .phase-active { background-color: ${firstBannerColor} !important; }
         .banner-text, .button-link { color: #FFFFFF !important; }
 
         /* Tables & Grids - Enforced #EEEEEE */

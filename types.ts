@@ -55,22 +55,26 @@ export interface ModuleData {
     color?: string;
     secondaryColor?: string;
     altText?: string;
-    // New properties
     selectedPhase?: string;
     metrics?: KpiMetric[];
     imagePosition?: 'left' | 'right';
     checklistItems?: ChecklistItem[];
-    // Flexible Two Column properties
     col1Type?: 'text' | 'image';
     col1Text?: string;
     col1ImageUrl?: string;
     col2Type?: 'text' | 'image';
     col2Text?: string;
     col2ImageUrl?: string;
-    // Legal properties
     chairman?: string;
     board?: string;
   };
+}
+
+export interface Template {
+  id: string;
+  name: string;
+  modules: ModuleData[];
+  lastModified: number;
 }
 
 export interface EmailState {
