@@ -316,7 +316,7 @@ const App: React.FC = () => {
             </div>
           )}
           <div className="absolute bottom-4 right-6 text-[10px] font-bold text-slate-400 pointer-events-none select-none uppercase tracking-widest opacity-50">
-            v0.4.6
+            v0.4.9
           </div>
         </div>
       </div>

@@ -47,67 +47,114 @@ const ModuleItemEditor: React.FC<Props> = ({ module, isSelected, onSelect, onCha
     onChange(module.id, { ...module.properties, [key]: value });
   };
 
-  const handleInsertExpression = (key: string) => {
-    const input = inputRefs.current[key];
-    const expression = `@{replace('!!!','VAR_NAME')}`;
-    
-    let currentValue = "";
+  const getValueForKey = (key: string): string => {
     if (key.startsWith('metric-value-')) {
-       const idx = parseInt(key.split('-')[2]);
-       currentValue = module.properties.metrics?.[idx]?.value || "";
+      const idx = parseInt(key.split('-')[2]);
+      return module.properties.metrics?.[idx]?.value || "";
     } else if (key.startsWith('metric-label-')) {
-       const idx = parseInt(key.split('-')[2]);
-       currentValue = module.properties.metrics?.[idx]?.label || "";
+      const idx = parseInt(key.split('-')[2]);
+      return module.properties.metrics?.[idx]?.label || "";
     } else if (key.startsWith('metric-color-')) {
-       const idx = parseInt(key.split('-')[2]);
-       currentValue = module.properties.metrics?.[idx]?.color || "";
+      const idx = parseInt(key.split('-')[2]);
+      return module.properties.metrics?.[idx]?.color || "";
     } else if (key.startsWith('checklist-text-')) {
-       const idx = parseInt(key.split('-')[2]);
-       currentValue = module.properties.checklistItems?.[idx]?.text || "";
-    } else {
-       currentValue = (module.properties as any)[key] || "";
+      const idx = parseInt(key.split('-')[2]);
+      return module.properties.checklistItems?.[idx]?.text || "";
+    } else if (key.startsWith('cell-')) {
+      const parts = key.split('-');
+      const r = parseInt(parts[1]);
+      const c = parseInt(parts[2]);
+      return module.properties.gridRows?.[r]?.cells[c] || "";
     }
+    return (module.properties as any)[key] || "";
+  };
+
+  const setValueForKey = (key: string, newValue: string) => {
+    if (key.startsWith('metric-value-')) {
+      const idx = parseInt(key.split('-')[2]);
+      const newMetrics = [...(module.properties.metrics || [])];
+      newMetrics[idx].value = newValue;
+      updateProp('metrics', newMetrics);
+    } else if (key.startsWith('metric-label-')) {
+      const idx = parseInt(key.split('-')[2]);
+      const newMetrics = [...(module.properties.metrics || [])];
+      newMetrics[idx].label = newValue;
+      updateProp('metrics', newMetrics);
+    } else if (key.startsWith('metric-color-')) {
+      const idx = parseInt(key.split('-')[2]);
+      const newMetrics = [...(module.properties.metrics || [])];
+      newMetrics[idx].color = newValue;
+      updateProp('metrics', newMetrics);
+    } else if (key.startsWith('checklist-text-')) {
+      const idx = parseInt(key.split('-')[2]);
+      const newItems = [...(module.properties.checklistItems || [])];
+      newItems[idx].text = newValue;
+      updateProp('checklistItems', newItems);
+    } else if (key.startsWith('cell-')) {
+      const parts = key.split('-');
+      const r = parseInt(parts[1]);
+      const c = parseInt(parts[2]);
+      handleCellChange(r, c, newValue);
+    } else {
+      updateProp(key, newValue);
+    }
+  };
+
+  const handleFormatting = (key: string, type: 'bold' | 'italic' | 'underline' | 'strike' | 'link' | 'expr') => {
+    const input = inputRefs.current[key];
+    if (!input) return;
+
+    const start = input.selectionStart || 0;
+    const end = input.selectionEnd || 0;
+    const currentValue = getValueForKey(key);
+    const selectedText = currentValue.substring(start, end);
     
-    if (input) {
-      const start = input.selectionStart || 0;
-      const end = input.selectionEnd || 0;
-      const newValue = currentValue.substring(0, start) + expression + currentValue.substring(end);
-      
-      if (key.startsWith('metric-value-')) {
-          const idx = parseInt(key.split('-')[2]);
-          const newMetrics = [...(module.properties.metrics || [])];
-          newMetrics[idx].value = newValue;
-          updateProp('metrics', newMetrics);
-      } else if (key.startsWith('metric-label-')) {
-          const idx = parseInt(key.split('-')[2]);
-          const newMetrics = [...(module.properties.metrics || [])];
-          newMetrics[idx].label = newValue;
-          updateProp('metrics', newMetrics);
-      } else if (key.startsWith('metric-color-')) {
-          const idx = parseInt(key.split('-')[2]);
-          const newMetrics = [...(module.properties.metrics || [])];
-          newMetrics[idx].color = newValue;
-          updateProp('metrics', newMetrics);
-      } else if (key.startsWith('checklist-text-')) {
-          const idx = parseInt(key.split('-')[2]);
-          const newItems = [...(module.properties.checklistItems || [])];
-          newItems[idx].text = newValue;
-          updateProp('checklistItems', newItems);
-      } else {
-          updateProp(key, newValue);
-      }
-      
-      setTimeout(() => {
-        if (inputRefs.current[key]) {
-          const field = inputRefs.current[key]!;
-          field.focus();
-          const newPos = start + expression.length;
-          field.setSelectionRange(newPos, newPos);
-        }
-      }, 10);
-    } else {
-      updateProp(key, currentValue + expression);
+    let wrappedText = "";
+    let moveCursor = 0;
+
+    if (type === 'expr') {
+      wrappedText = `@{replace('!!!','VAR_NAME')}`;
+    } else if (type === 'bold') {
+      wrappedText = `<b>${selectedText}</b>`;
+    } else if (type === 'italic') {
+      wrappedText = `<i>${selectedText}</i>`;
+    } else if (type === 'underline') {
+      wrappedText = `<u>${selectedText}</u>`;
+    } else if (type === 'strike') {
+      wrappedText = `<s>${selectedText}</s>`;
+    } else if (type === 'link') {
+      const url = window.prompt("Enter Hyperlink URL:", "https://");
+      if (url === null) return;
+      wrappedText = `<a href="${url}">${selectedText || 'link'}</a>`;
     }
+
+    const newValue = currentValue.substring(0, start) + wrappedText + currentValue.substring(end);
+    setValueForKey(key, newValue);
+
+    setTimeout(() => {
+      const field = inputRefs.current[key];
+      if (field) {
+        field.focus();
+        const newPos = start + wrappedText.length;
+        field.setSelectionRange(newPos, newPos);
+      }
+    }, 10);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent, key: string) => {
+    const isMod = e.ctrlKey || e.metaKey;
+    if (!isMod) return;
+
+    const k = e.key.toLowerCase();
+    if (['b', 'i', 'u', 's', 'k'].includes(k)) {
+      e.preventDefault();
+      const typeMap: Record<string, any> = { b: 'bold', i: 'italic', u: 'underline', s: 'strike', k: 'link' };
+      handleFormatting(key, typeMap[k]);
+    }
+  };
+
+  const handleInsertExpression = (key: string) => {
+    handleFormatting(key, 'expr');
   };
 
   const handleGlobalInsertExpression = () => {
@@ -117,18 +164,9 @@ const ModuleItemEditor: React.FC<Props> = ({ module, isSelected, onSelect, onCha
   };
 
   const handleTableCellInsert = () => {
-    if (!lastFocusedCellRef.current) return;
-    const { r, c } = lastFocusedCellRef.current;
-    const fieldKey = `cell-${r}-${c}`;
-    const input = inputRefs.current[fieldKey];
-    const expression = `@{replace('!!!','VAR_NAME')}`;
-    const currentRows = module.properties.gridRows || [];
-    const currentValue = currentRows[r]?.cells[c] || "";
-    if (input) {
-      const start = (input as HTMLInputElement).selectionStart || 0;
-      const end = (input as HTMLInputElement).selectionEnd || 0;
-      const newValue = currentValue.substring(0, start) + expression + currentValue.substring(end);
-      handleCellChange(r, c, newValue);
+    if (lastFocusedCellRef.current) {
+      const { r, c } = lastFocusedCellRef.current;
+      handleInsertExpression(`cell-${r}-${c}`);
     }
   };
 
@@ -261,8 +299,10 @@ const ModuleItemEditor: React.FC<Props> = ({ module, isSelected, onSelect, onCha
               type="text" 
               value={module.properties.title} 
               onFocus={() => { lastFocusedKeyRef.current = 'title'; }}
+              onKeyDown={(e) => handleKeyDown(e, 'title')}
               onChange={(e) => updateProp('title', e.target.value)} 
               className={inputClass} 
+              placeholder="Title text (Ctrl+B for Bold, etc.)"
             />
           </div>
         )}
@@ -293,8 +333,10 @@ const ModuleItemEditor: React.FC<Props> = ({ module, isSelected, onSelect, onCha
               rows={3} 
               value={module.properties.content} 
               onFocus={() => { lastFocusedKeyRef.current = 'content'; }}
+              onKeyDown={(e) => handleKeyDown(e, 'content')}
               onChange={(e) => updateProp('content', e.target.value)} 
               className={`${inputClass} resize-none`} 
+              placeholder="Multiline content. Use Ctrl+B, Ctrl+I, Ctrl+U, Ctrl+S, Ctrl+K for formatting."
             />
           </div>
         )}
@@ -308,6 +350,7 @@ const ModuleItemEditor: React.FC<Props> = ({ module, isSelected, onSelect, onCha
                 type="text" 
                 value={module.properties.buttonText || ''} 
                 onFocus={() => { lastFocusedKeyRef.current = 'buttonText'; }}
+                onKeyDown={(e) => handleKeyDown(e, 'buttonText')}
                 onChange={(e) => updateProp('buttonText', e.target.value)} 
                 className={inputClass} 
               />
@@ -428,6 +471,7 @@ const ModuleItemEditor: React.FC<Props> = ({ module, isSelected, onSelect, onCha
                   <input 
                     ref={el => { inputRefs.current[`metric-value-${idx}`] = el; }}
                     onFocus={() => { lastFocusedKeyRef.current = `metric-value-${idx}`; }}
+                    onKeyDown={(e) => handleKeyDown(e, `metric-value-${idx}`)}
                     type="text" 
                     placeholder="Value" 
                     value={m.value} 
@@ -441,6 +485,7 @@ const ModuleItemEditor: React.FC<Props> = ({ module, isSelected, onSelect, onCha
                   <input 
                     ref={el => { inputRefs.current[`metric-label-${idx}`] = el; }}
                     onFocus={() => { lastFocusedKeyRef.current = `metric-label-${idx}`; }}
+                    onKeyDown={(e) => handleKeyDown(e, `metric-label-${idx}`)}
                     type="text" 
                     placeholder="Label" 
                     value={m.label} 
@@ -537,6 +582,7 @@ const ModuleItemEditor: React.FC<Props> = ({ module, isSelected, onSelect, onCha
                 <textarea 
                   ref={el => { inputRefs.current[`checklist-text-${idx}`] = el; }}
                   onFocus={() => { lastFocusedKeyRef.current = `checklist-text-${idx}`; }}
+                  onKeyDown={(e) => handleKeyDown(e, `checklist-text-${idx}`)}
                   rows={1} 
                   value={item.text} 
                   onChange={e => {
@@ -597,6 +643,7 @@ const ModuleItemEditor: React.FC<Props> = ({ module, isSelected, onSelect, onCha
                           lastFocusedCellRef.current = { r: rIdx, c: cIdx };
                           lastFocusedKeyRef.current = `cell-${rIdx}-${cIdx}`; 
                         }} 
+                        onKeyDown={(e) => handleKeyDown(e, `cell-${rIdx}-${cIdx}`)}
                         onChange={(e) => handleCellChange(rIdx, cIdx, e.target.value)} 
                         className="w-24 text-xs border border-[#D7E5FC] rounded px-2 py-1.5 focus:border-blue-400 outline-none focus:ring-1 focus:ring-blue-500/10 transition-all" 
                       />

@@ -60,9 +60,8 @@ export const renderModuleToHtml = (module: ModuleData, prevModuleType?: ModuleTy
 
         case ModuleType.TEXT:
             const textAlign = properties.align || 'left';
-            content = properties.content?.split('\n').map(p => 
-                p.trim() ? `<p style="margin-bottom: 15px; margin-top: 25px; font-size: 15px; text-align: ${textAlign};">${p}</p>` : ''
-            ).filter(Boolean).join('\n') || '';
+            const formattedText = (properties.content || '').replace(/\n/g, '<br>');
+            content = `<div style="margin-top: 25px; margin-bottom: 15px; font-size: 15px; text-align: ${textAlign}; line-height: 1.5;">${formattedText}</div>`;
             break;
 
         case ModuleType.IMAGE:
@@ -114,8 +113,9 @@ export const renderModuleToHtml = (module: ModuleData, prevModuleType?: ModuleTy
             break;
 
         case ModuleType.BUTTON:
+            const formattedButtonContent = (properties.content || '').replace(/\n/g, '<br>');
             content = `<div style="margin-top: 25px; text-align: center; padding: 20px; background-color: #f9f9f9; border-radius: 8px;">
-    <p style="margin: 0 0 15px 0; font-size: 13px; color: #666;">${properties.content}</p>
+    <p style="margin: 0 0 15px 0; font-size: 13px; color: #666; line-height: 1.5;">${formattedButtonContent}</p>
     <a href="${properties.url}" style="background-color: ${properties.color || '#0078DC'}; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block; font-size: 14px; transition: all 0.3s ease;">${properties.buttonText}</a>
 </div>`;
             break;
@@ -134,8 +134,9 @@ export const renderModuleToHtml = (module: ModuleData, prevModuleType?: ModuleTy
     </div>
 </div>` : '';
 
-            content = `<p style="font-size: 11px; color: #C6C6C6; text-align: center; margin-top: 20px;">
-    ${properties.content}
+            const formattedSigContent = (properties.content || '').replace(/\n/g, '<br>');
+            content = `<p style="font-size: 11px; color: #C6C6C6; text-align: center; margin-top: 20px; line-height: 1.5;">
+    ${formattedSigContent}
 </p>
 <div style="text-align: center; margin-top: 40px; ${!properties.hasStarRating ? 'margin-bottom: 40px;' : ''}">
     <img src="${properties.imageUrl}" alt="Footer Logo" style="display: inline-block; width: auto; max-width: 640px; height: 40px;">
@@ -182,15 +183,13 @@ export const renderModuleToHtml = (module: ModuleData, prevModuleType?: ModuleTy
 
         case ModuleType.TWO_COLUMN:
             const isTwoColRight = properties.imagePosition === 'right';
-            const twoColTextContent = properties.content?.split('\n').map(p => 
-                p.trim() ? `<p style="margin: 0 0 10px 0;">${p}</p>` : ''
-            ).filter(Boolean).join('') || '';
+            const formattedTwoColContent = (properties.content || '').replace(/\n/g, '<br>');
 
             const twoColImgPart = `<td style="width: 45%; padding: 10px; vertical-align: middle;">
     <img src="${properties.imageUrl}" width="100%" style="display: block; width: 100%; height: auto; border-radius: 6px;">
 </td>`;
             const twoColTextPart = `<td style="width: 55%; padding: 10px; vertical-align: middle;">
-    <div style="font-size: 15px; color: #333333; line-height: 1.5;">${twoColTextContent}</div>
+    <div style="font-size: 15px; color: #333333; line-height: 1.5;">${formattedTwoColContent}</div>
 </td>`;
             content = `<table cellspacing="0" cellpadding="0" border="0" style="width: 100%; max-width: 640px; margin: 25px auto;">
     <tbody>
@@ -248,7 +247,7 @@ export const generateFullHtml = (modules: ModuleData[]): string => {
     </style>
 </head>
 <body style="background-color: #f4f4f4; padding: 20px 0;">
-    <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 640px; margin: auto; background-color: #ffffff; color: #333; padding: 20px 20px 40px 20px; border-radius: 8px; box-shadow: 0 0 60px -15px rgba(0,0,0,0.3);">
+    <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 640px; margin: auto; background-color: #ffffff; color: #333; padding: 20px 20px 60px 20px; border-radius: 12px; box-shadow: 0 0 60px -15px rgba(0,0,0,0.3);">
 ${insideHtml}
     </div>
     <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 640px; margin: 40px auto 0 auto; color: #333;">
