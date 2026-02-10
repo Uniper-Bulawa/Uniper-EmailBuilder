@@ -36,7 +36,8 @@ export const renderModuleToHtml = (module: ModuleData, prevModuleType?: ModuleTy
 
     switch (type) {
         case ModuleType.HEADER_LOGO:
-            content = `<div style="text-align: ${properties.align || 'right'}; margin-bottom: 20px; margin-top: 40px;">
+            // Reduced margin-top from 40px to 20px
+            content = `<div style="text-align: ${properties.align || 'right'}; margin-bottom: 20px; margin-top: 20px;">
     <img src="${properties.imageUrl}" width="auto" alt="${properties.altText || getFileName(properties.imageUrl)}" style="display: inline-block; width: auto; max-width: 640px; height: auto;">
 </div>`;
             break;
@@ -44,8 +45,14 @@ export const renderModuleToHtml = (module: ModuleData, prevModuleType?: ModuleTy
         case ModuleType.BANNER:
             const isFollowedByDP = nextModuleType === ModuleType.DELIVERY_PHASE;
             const bannerRadius = isFollowedByDP ? '12px 12px 0 0' : '12px';
+            
+            // Outlook Desktop Fix: v:roundrect rounds all 4 corners. 
+            // If followed by DP, we use v:rect (square) for a flush connection in the Reading Pane.
+            const vmlTag = isFollowedByDP ? 'v:rect' : 'v:roundrect';
+            const arcSize = isFollowedByDP ? '' : 'arcsize="24%"';
+
             content = `<!--[if mso]>
-<v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" style="height:50px;v-text-anchor:middle;width:640px;" arcsize="24%" stroke="f" fillcolor="${properties.color}">
+<${vmlTag} xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" style="height:50px;v-text-anchor:middle;width:640px;" ${arcSize} stroke="f" fillcolor="${properties.color}">
     <w:anchorlock/>
     <center>
 <![endif]-->
@@ -54,7 +61,7 @@ export const renderModuleToHtml = (module: ModuleData, prevModuleType?: ModuleTy
 </div>
 <!--[if mso]>
     </center>
-</v:roundrect>
+</${vmlTag}>
 <![endif]-->`;
             break;
 
@@ -85,6 +92,7 @@ export const renderModuleToHtml = (module: ModuleData, prevModuleType?: ModuleTy
             const rows = properties.gridRows || [];
             const hasColumnHeaders = !!properties.hasColumnHeaders;
             const hasRowHeaders = !!properties.hasRowHeaders;
+            const tableBorderColor = '#EEEEEE'; // More subtle color for better dark mode compatibility
 
             const rowsHtml = rows.map((row, rIdx) => {
                 const isHeaderRow = hasColumnHeaders && rIdx === 0;
@@ -92,7 +100,7 @@ export const renderModuleToHtml = (module: ModuleData, prevModuleType?: ModuleTy
                     const isHeaderCell = (hasRowHeaders && cIdx === 0) || isHeaderRow;
                     const tag = isHeaderCell ? 'th' : 'td';
                     
-                    let cellStyle = 'padding: 12px; border: 1px solid #D7E5FC; text-align: left;';
+                    let cellStyle = `padding: 12px; border: 1px solid ${tableBorderColor}; text-align: left;`;
                     if (isHeaderRow) {
                         cellStyle += ' background-color: #f2f2f2; color: #0078DC; font-weight: bold;';
                     } else if (hasRowHeaders && cIdx === 0) {
@@ -106,7 +114,7 @@ export const renderModuleToHtml = (module: ModuleData, prevModuleType?: ModuleTy
                 return `\n        <tr>${cellsHtml}\n        </tr>`;
             }).join('');
 
-            content = `<table cellspacing="0" cellpadding="0" border="0" style="width: 100%; max-width: 640px; margin: 25px auto; border-collapse: collapse; font-size: 14px; border: 1px solid #D7E5FC; border-radius: 8px; overflow: hidden;">
+            content = `<table cellspacing="0" cellpadding="0" border="0" style="width: 100%; max-width: 640px; margin: 25px auto; border-collapse: collapse; font-size: 14px; border: 1px solid ${tableBorderColor}; border-radius: 8px; overflow: hidden;">
     <tbody>${rowsHtml}
     </tbody>
 </table>`;
@@ -145,16 +153,26 @@ export const renderModuleToHtml = (module: ModuleData, prevModuleType?: ModuleTy
 
         case ModuleType.DELIVERY_PHASE:
             const phases = ['L3 Prio', 'Assess', 'Design', 'Plan', 'Develop', 'Document', 'Train', 'Handover', 'Live'];
-            const phaseCells = phases.map(p => {
+            const gridColor = '#E0E0E0'; // Subtle gray for better dark mode handling than pure white
+            const phaseCells = phases.map((p, idx) => {
                 const isActive = p === properties.selectedPhase;
                 const bg = isActive ? '#0078DC' : '#f2f2f2';
                 const color = isActive ? '#ffffff' : '#999999';
                 const weight = isActive ? 'bold' : 'normal';
-                return `<td style="padding: 10px 4px; background-color: ${bg}; color: ${color}; font-size: 10px; text-align: center; font-weight: ${weight}; border-right: 1px solid #ffffff;">${p}</td>`;
+                
+                // Remove border-right for the last cell to remove the outer right border
+                const borderStyle = idx === phases.length - 1 ? '' : `border-right: 1px solid ${gridColor};`;
+                
+                return `<td style="padding: 10px 4px; background-color: ${bg}; color: ${color}; font-size: 10px; text-align: center; font-weight: ${weight}; ${borderStyle}">${p}</td>`;
             }).join('');
+            
             const isFollowedBanner = prevModuleType === ModuleType.BANNER;
             const dpRadius = isFollowedBanner ? '0 0 12px 12px' : '12px';
-            content = `<table cellspacing="0" cellpadding="0" border="0" style="width: 100%; max-width: 640px; margin: 0 auto 25px auto; border-collapse: collapse; overflow: hidden; border-radius: ${dpRadius};">
+            
+            // Outlook Fix: Ensure the table is perfectly aligned if it's following a banner
+            const dpMarginTop = isFollowedBanner ? '0' : '25px';
+
+            content = `<table cellspacing="0" cellpadding="0" border="0" style="width: 100%; max-width: 640px; margin: ${dpMarginTop} auto 25px auto; border-collapse: collapse; overflow: hidden; border-radius: ${dpRadius};">
     <tbody>
         <tr>
             ${phaseCells}
@@ -217,6 +235,16 @@ export const renderModuleToHtml = (module: ModuleData, prevModuleType?: ModuleTy
 </table>`;
             break;
 
+        case ModuleType.LEGAL:
+            content = `<div style="margin-top: 25px; margin-bottom: 25px; font-size: 11px; color: #C6C6C6; text-align: left; line-height: 1.5;">
+    Uniper Global Commodities SE, Holzstraße 6, 40221 Düsseldorf, Germany<br>
+    Sitz/Registered Office: Düsseldorf, Amtsgericht/DistrictCourt Düsseldorf HRB 61123<br>
+    Vorsitzender des Aufsichtsrats/Chairman of the Supervisory Board: ${properties.chairman || '[CHAIRMAN]'}<br>
+    Vorstand/Board of Management: ${properties.board || '[BOARD]'}<br><br>
+    Besucheradresse/Visiting address: Franziusstraße 10, 40219 Düsseldorf, Germany
+</div>`;
+            break;
+
         default:
             content = '';
     }
@@ -224,7 +252,7 @@ export const renderModuleToHtml = (module: ModuleData, prevModuleType?: ModuleTy
     return `<!-- START_ID:${id} -->\n\n${content.trim()}\n\n<!-- END_ID:${id} -->`;
 };
 
-export const generateFullHtml = (modules: ModuleData[]): string => {
+export const generateFullHtml = (modules: ModuleData[], isDarkMode: boolean = false): string => {
     const insideModules = modules.filter(m => m.section === 'inside');
     const outsideModules = modules.filter(m => m.section === 'outside');
 
@@ -237,6 +265,20 @@ export const generateFullHtml = (modules: ModuleData[]): string => {
     const insideHtml = renderList(insideModules);
     const outsideHtml = renderList(outsideModules);
 
+    // Dark Mode Simulation: Inverts everything and then counter-inverts images to simulate Outlook's filter logic.
+    const darkSimulationStyles = isDarkMode ? `
+        html, body { 
+            background-color: #2d2d2d !important; 
+            filter: invert(100%) hue-rotate(180deg); 
+        }
+        img, .no-invert { 
+            filter: invert(100%) hue-rotate(180deg); 
+        }
+        .main-container {
+            background-color: #ffffff !important;
+        }
+    ` : '';
+
     return `<!DOCTYPE html>
 <html>
 <head>
@@ -244,10 +286,11 @@ export const generateFullHtml = (modules: ModuleData[]): string => {
     <style>
         body { margin: 0; padding: 0; }
         .cta-button:hover { background-color: #135B8B !important; }
+        ${darkSimulationStyles}
     </style>
 </head>
 <body style="background-color: #f4f4f4; padding: 20px 0;">
-    <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 640px; margin: auto; background-color: #ffffff; color: #333; padding: 20px 20px 60px 20px; border-radius: 12px; box-shadow: 0 0 60px -15px rgba(0,0,0,0.3);">
+    <div class="main-container" style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 640px; margin: 40px auto 0 auto; background-color: #ffffff; color: #333; padding: 20px 20px 60px 20px; border-radius: 12px; box-shadow: 0 4px 30px rgba(0,0,0,0.06);">
 ${insideHtml}
     </div>
     <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 640px; margin: 40px auto 0 auto; color: #333;">

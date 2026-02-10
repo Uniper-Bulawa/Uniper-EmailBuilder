@@ -4,14 +4,21 @@ import { DEFAULT_MODULES } from './constants';
 import { generateFullHtml } from './utils';
 import ModuleItemEditor from './components/ModuleItemEditor';
 
+const APP_VERSION = 'v0.7.0';
+
 const App: React.FC = () => {
   const [modules, setModules] = useState<ModuleData[]>(DEFAULT_MODULES);
   const [activeTab, setActiveTab] = useState<'preview' | 'code'>('preview');
+  const [isPreviewDarkMode, setIsPreviewDarkMode] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
   const [selectedModuleId, setSelectedModuleId] = useState<string | null>(modules[0]?.id || null);
   const codeContainerRef = useRef<HTMLDivElement>(null);
 
-  const fullHtml = useMemo(() => generateFullHtml(modules), [modules]);
+  // Clean HTML for actual production/code export
+  const exportHtml = useMemo(() => generateFullHtml(modules, false), [modules]);
+  
+  // Simulated HTML for the preview iframe (handles dark mode simulation)
+  const previewHtml = useMemo(() => generateFullHtml(modules, isPreviewDarkMode), [modules, isPreviewDarkMode]);
 
   const updateModule = useCallback((id: string, properties: any) => {
     setModules(prev => prev.map(m => m.id === id ? { ...m, properties } : m));
@@ -83,7 +90,7 @@ const App: React.FC = () => {
         baseModule.properties = { title: 'New Banner Title', color: '#0078DC' };
         break;
       case ModuleType.TEXT:
-        baseModule.properties = { content: 'Add your text here...', align: 'left' };
+        baseModule.properties = { content: "Dear @{replace('!!!','Recipient')},\n\nAdd your text here...", align: 'left' };
         break;
       case ModuleType.IMAGE:
         baseModule.properties = { imageUrl: 'https://picsum.photos/640/300', altText: '300', align: 'center' };
@@ -102,7 +109,7 @@ const App: React.FC = () => {
         baseModule.properties = { content: 'Call to action text', buttonText: 'Click Me', url: '#', color: '#0078DC' };
         break;
       case ModuleType.SIGNATURE:
-        baseModule.properties = { content: 'Automatic Email Disclaimer', imageUrl: 'https://raw.githubusercontent.com/Uniper-Bulawa/dot-email-assets/main/report_logo_DOT.png', hasStarRating: true };
+        baseModule.properties = { content: '<b>Automatic Email Disclaimer</b>', imageUrl: 'https://raw.githubusercontent.com/Uniper-Bulawa/dot-email-assets/main/report_logo_DOT.png', hasStarRating: true };
         baseModule.section = 'outside';
         break;
       case ModuleType.DELIVERY_PHASE:
@@ -133,6 +140,13 @@ const App: React.FC = () => {
           ]
         };
         break;
+      case ModuleType.LEGAL:
+        baseModule.properties = {
+          chairman: 'Michael Lewis',
+          board: 'Dr. Carsten Poppinga (Vorsitzender/Chairman), Dr. Thomas Linßen'
+        };
+        baseModule.section = 'outside';
+        break;
     }
     
     setModules(prev => {
@@ -150,7 +164,7 @@ const App: React.FC = () => {
   };
 
   const copyToClipboard = () => {
-    navigator.clipboard.writeText(fullHtml);
+    navigator.clipboard.writeText(exportHtml);
     setCopySuccess(true);
     setTimeout(() => setCopySuccess(false), 2000);
   };
@@ -167,7 +181,7 @@ const App: React.FC = () => {
   }, [activeTab, selectedModuleId]);
 
   const renderCodeSegments = () => {
-    const segments = fullHtml.split(/(<!-- START_ID:.*? -->|<!-- END_ID:.*? -->)/);
+    const segments = exportHtml.split(/(<!-- START_ID:.*? -->|<!-- END_ID:.*? -->)/);
     let currentId: string | null = null;
     let globalLineIndex = 1;
     
@@ -227,7 +241,10 @@ const App: React.FC = () => {
           <div className="flex items-center gap-3">
             <img src="https://raw.githubusercontent.com/Uniper-Bulawa/dot-email-assets/main/DOT_small_bm.png" className="h-[20px] w-auto object-contain" alt="DOT Logo" />
             <div className="h-5 w-px bg-slate-200"></div>
-            <h1 className="font-bold text-slate-800 text-sm whitespace-nowrap">Email Builder</h1>
+            <div className="flex flex-col">
+              <h1 className="font-bold text-slate-800 text-sm whitespace-nowrap leading-none">Email Builder</h1>
+              <span className="text-[9px] font-bold text-slate-400 mt-0.5">{APP_VERSION}</span>
+            </div>
           </div>
           <div className="relative group">
             <button className="bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold px-3 py-2 rounded-lg flex items-center gap-1 transition-all shadow-sm">
@@ -295,18 +312,42 @@ const App: React.FC = () => {
       </div>
       <div className="flex-1 flex flex-col bg-slate-100 overflow-hidden">
         <div className="h-14 border-b border-slate-200 bg-white flex items-center justify-between px-6 shadow-sm">
-          <div className="flex bg-slate-100 p-1 rounded-lg">
-            <button onClick={() => setActiveTab('preview')} className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${activeTab === 'preview' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>Preview</button>
-            <button onClick={() => setActiveTab('code')} className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${activeTab === 'code' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>Export HTML</button>
+          <div className="flex items-center">
+            <div className="flex bg-slate-100 p-1 rounded-lg">
+              <button onClick={() => setActiveTab('preview')} className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${activeTab === 'preview' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>Preview</button>
+              <button onClick={() => setActiveTab('code')} className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${activeTab === 'code' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>HTML</button>
+            </div>
+            
+            {/* Dark Mode Segmented Toggle */}
+            {activeTab === 'preview' && (
+              <div className="flex items-center gap-3 ml-4 pl-4 border-l border-slate-200">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Mode</span>
+                <div className="flex bg-slate-100 p-1 rounded-lg">
+                  <button 
+                    onClick={() => setIsPreviewDarkMode(false)} 
+                    className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${!isPreviewDarkMode ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
+                  >
+                    LIGHT
+                  </button>
+                  <button 
+                    onClick={() => setIsPreviewDarkMode(true)} 
+                    className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${isPreviewDarkMode ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
+                  >
+                    DARK
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
+
           <button onClick={copyToClipboard} className={`flex items-center gap-2 text-xs font-bold px-4 py-2 rounded-lg transition-all ${copySuccess ? 'bg-green-100 text-green-700' : 'bg-slate-900 text-white hover:bg-slate-800 shadow-md active:scale-95'}`}>
             {copySuccess ? 'Copied!' : 'Copy Code'}
           </button>
         </div>
         <div className="flex-1 overflow-auto p-8 flex justify-center items-start bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] [background-size:20px_20px] relative">
           {activeTab === 'preview' ? (
-            <div className="w-full max-w-[1000px] bg-white rounded-xl shadow-[0_0_60px_-15px_rgba(0,0,0,0.3)] overflow-hidden border border-slate-200">
-              <iframe srcDoc={fullHtml} className="w-full h-[calc(100vh-160px)] border-none" title="Email Preview" />
+            <div className="w-full max-w-[1000px] bg-white rounded-xl shadow-[0_4px_30px_rgba(0,0,0,0.06)] overflow-hidden border border-slate-200">
+              <iframe srcDoc={previewHtml} className="w-full h-[calc(100vh-160px)] border-none" title="Email Preview" />
             </div>
           ) : (
             <div className="w-full max-w-[1000px] h-full" ref={codeContainerRef}>
@@ -316,7 +357,7 @@ const App: React.FC = () => {
             </div>
           )}
           <div className="absolute bottom-4 right-6 text-[10px] font-bold text-slate-400 pointer-events-none select-none uppercase tracking-widest opacity-50">
-            v0.4.9
+            {APP_VERSION}
           </div>
         </div>
       </div>

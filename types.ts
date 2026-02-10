@@ -9,7 +9,8 @@ export enum ModuleType {
   DELIVERY_PHASE = 'DELIVERY_PHASE',
   KPI_CARDS = 'KPI_CARDS',
   TWO_COLUMN = 'TWO_COLUMN',
-  CHECKLIST = 'CHECKLIST'
+  CHECKLIST = 'CHECKLIST',
+  LEGAL = 'LEGAL'
 }
 
 export interface TableRow {
@@ -59,6 +60,9 @@ export interface ModuleData {
     metrics?: KpiMetric[];
     imagePosition?: 'left' | 'right';
     checklistItems?: ChecklistItem[];
+    // Legal properties
+    chairman?: string;
+    board?: string;
   };
 }
 

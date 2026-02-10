@@ -38,6 +38,16 @@ const LOGO_BASE_URL = 'https://raw.githubusercontent.com/Uniper-Bulawa/dot-email
 
 const KPI_COLORS = ['#00944A', '#ED8C1C', '#E6252E', '#0078DC'];
 
+/**
+ * AVAILABLE SHORTCUTS (CTRL / META + KEY):
+ * B -> Bold
+ * I -> Italic
+ * U -> Underline
+ * S -> Strike
+ * K -> Link (<a href="URL" style="color:#0078DC;">DISPLAY TEXT</a>)
+ * E -> Insert Expression (@{replace('!!!','REFERENCE')})
+ */
+
 const ModuleItemEditor: React.FC<Props> = ({ module, isSelected, onSelect, onChange, onRemove, onMoveUp, onMoveDown }) => {
   const inputRefs = useRef<{ [key: string]: HTMLInputElement | HTMLTextAreaElement | null }>({});
   const lastFocusedKeyRef = useRef<string | null>(null);
@@ -110,10 +120,9 @@ const ModuleItemEditor: React.FC<Props> = ({ module, isSelected, onSelect, onCha
     const selectedText = currentValue.substring(start, end);
     
     let wrappedText = "";
-    let moveCursor = 0;
 
     if (type === 'expr') {
-      wrappedText = `@{replace('!!!','VAR_NAME')}`;
+      wrappedText = `@{replace('!!!','REFERENCE')}`;
     } else if (type === 'bold') {
       wrappedText = `<b>${selectedText}</b>`;
     } else if (type === 'italic') {
@@ -123,14 +132,14 @@ const ModuleItemEditor: React.FC<Props> = ({ module, isSelected, onSelect, onCha
     } else if (type === 'strike') {
       wrappedText = `<s>${selectedText}</s>`;
     } else if (type === 'link') {
-      const url = window.prompt("Enter Hyperlink URL:", "https://");
-      if (url === null) return;
-      wrappedText = `<a href="${url}">${selectedText || 'link'}</a>`;
+      // Changed to direct insertion per user request
+      wrappedText = `<a href="URL" style="color:#0078DC;">${selectedText || 'DISPLAY TEXT'}</a>`;
     }
 
     const newValue = currentValue.substring(0, start) + wrappedText + currentValue.substring(end);
     setValueForKey(key, newValue);
 
+    // Using a shorter timeout as no prompt window is opened
     setTimeout(() => {
       const field = inputRefs.current[key];
       if (field) {
@@ -138,18 +147,28 @@ const ModuleItemEditor: React.FC<Props> = ({ module, isSelected, onSelect, onCha
         const newPos = start + wrappedText.length;
         field.setSelectionRange(newPos, newPos);
       }
-    }, 10);
+    }, 30);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent, key: string) => {
     const isMod = e.ctrlKey || e.metaKey;
     if (!isMod) return;
 
-    const k = e.key.toLowerCase();
-    if (['b', 'i', 'u', 's', 'k'].includes(k)) {
+    const code = e.code;
+    const formatMap: Record<string, 'bold' | 'italic' | 'underline' | 'strike' | 'link' | 'expr'> = {
+      'KeyB': 'bold',
+      'KeyI': 'italic',
+      'KeyU': 'underline',
+      'KeyS': 'strike',
+      'KeyK': 'link',
+      'KeyE': 'expr'
+    };
+
+    if (formatMap[code]) {
+      // CRITICAL: Block default browser behavior (especially for Ctrl+K in Edge/Chrome)
       e.preventDefault();
-      const typeMap: Record<string, any> = { b: 'bold', i: 'italic', u: 'underline', s: 'strike', k: 'link' };
-      handleFormatting(key, typeMap[k]);
+      e.stopPropagation();
+      handleFormatting(key, formatMap[code]);
     }
   };
 
@@ -302,7 +321,7 @@ const ModuleItemEditor: React.FC<Props> = ({ module, isSelected, onSelect, onCha
               onKeyDown={(e) => handleKeyDown(e, 'title')}
               onChange={(e) => updateProp('title', e.target.value)} 
               className={inputClass} 
-              placeholder="Title text (Ctrl+B for Bold, etc.)"
+              placeholder="Title text (Ctrl+B, Ctrl+K, etc.)"
             />
           </div>
         )}
@@ -601,6 +620,36 @@ const ModuleItemEditor: React.FC<Props> = ({ module, isSelected, onSelect, onCha
             <button onClick={() => updateProp('checklistItems', [...(module.properties.checklistItems || []), { text: '', icon: 'empty' }])} className="w-full py-1 text-[10px] font-bold text-blue-600 bg-blue-50 border border-dashed border-blue-200 rounded outline-none focus:ring-1 focus:ring-blue-500/20">
               + ADD ITEM
             </button>
+          </div>
+        )}
+
+        {/* LEGAL Editor */}
+        {module.type === ModuleType.LEGAL && (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Chairman of the Supervisory Board</label>
+              <input 
+                ref={el => { inputRefs.current['chairman'] = el; }} 
+                type="text" 
+                value={module.properties.chairman || ''} 
+                onFocus={() => { lastFocusedKeyRef.current = 'chairman'; }}
+                onChange={(e) => updateProp('chairman', e.target.value)} 
+                className={inputClass} 
+                placeholder="Name of Chairman"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Board of Management</label>
+              <textarea 
+                ref={el => { inputRefs.current['board'] = el; }} 
+                rows={2}
+                value={module.properties.board || ''} 
+                onFocus={() => { lastFocusedKeyRef.current = 'board'; }}
+                onChange={(e) => updateProp('board', e.target.value)} 
+                className={`${inputClass} resize-none`} 
+                placeholder="Names of Board Members"
+              />
+            </div>
           </div>
         )}
 

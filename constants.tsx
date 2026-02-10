@@ -33,8 +33,23 @@ export const DEFAULT_MODULES: ModuleData[] = [
     type: ModuleType.TEXT,
     section: 'inside',
     properties: {
-      content: "Dear @{replace('!!!','Recipient')},\n\nWe are pleased to provide you with the latest metrics regarding the digitalization progress.",
+      content: "Dear @{replace('!!!','Recipient')},\n\nWelcome to the Email Builder. This professional tool enables you to create brand-aligned HTML snippets for customized automated emails. Simply assemble your content using the modular system and export the clean code for Power Automate.",
       align: 'left'
+    }
+  },
+  {
+    id: 'm-shortcuts',
+    type: ModuleType.CHECKLIST,
+    section: 'inside',
+    properties: {
+      checklistItems: [
+        { text: '<b>Ctrl + B</b>: Bold', icon: 'blue' },
+        { text: '<b>Ctrl + I</b>: Italic', icon: 'blue' },
+        { text: '<b>Ctrl + U</b>: Underline', icon: 'blue' },
+        { text: '<b>Ctrl + S</b>: Strike through', icon: 'blue' },
+        { text: '<b>Ctrl + K</b>: Insert Link tag', icon: 'blue' },
+        { text: '<b>Ctrl + E</b>: Insert @{replace(\'!!!\',\'REFERENCE\')}', icon: 'blue' }
+      ]
     }
   },
   {
@@ -94,11 +109,20 @@ export const DEFAULT_MODULES: ModuleData[] = [
     }
   },
   {
+    id: 'm-legal',
+    type: ModuleType.LEGAL,
+    section: 'outside',
+    properties: {
+      chairman: 'Michael Lewis',
+      board: 'Dr. Carsten Poppinga (Vorsitzender/Chairman), Dr. Thomas Linßen'
+    }
+  },
+  {
     id: 'm8',
     type: ModuleType.SIGNATURE,
     section: 'outside',
     properties: {
-      content: 'This is an automatically generated email.',
+      content: '<br><b>This is an automatically generated email.</b>',
       imageUrl: 'https://raw.githubusercontent.com/Uniper-Bulawa/dot-email-assets/main/report_logo_DOT.png',
       hasStarRating: true
     }
