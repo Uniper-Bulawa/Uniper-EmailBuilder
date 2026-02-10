@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { ModuleData, ModuleType } from './types';
 import { DEFAULT_MODULES } from './constants';
 import { generateFullHtml } from './utils';
@@ -9,6 +8,8 @@ const App: React.FC = () => {
   const [modules, setModules] = useState<ModuleData[]>(DEFAULT_MODULES);
   const [activeTab, setActiveTab] = useState<'preview' | 'code'>('preview');
   const [copySuccess, setCopySuccess] = useState(false);
+  const [selectedModuleId, setSelectedModuleId] = useState<string | null>(modules[0]?.id || null);
+  const codeContainerRef = useRef<HTMLDivElement>(null);
 
   const fullHtml = useMemo(() => generateFullHtml(modules), [modules]);
 
@@ -17,8 +18,14 @@ const App: React.FC = () => {
   }, []);
 
   const removeModule = useCallback((id: string) => {
-    setModules(prev => prev.filter(m => m.id !== id));
-  }, []);
+    setModules(prev => {
+      const filtered = prev.filter(m => m.id !== id);
+      if (selectedModuleId === id) {
+        setSelectedModuleId(filtered[0]?.id || null);
+      }
+      return filtered;
+    });
+  }, [selectedModuleId]);
 
   const moveModule = useCallback((id: string, direction: 'up' | 'down') => {
     setModules(prev => {
@@ -38,7 +45,6 @@ const App: React.FC = () => {
     const id = `m-${Date.now()}`;
     const baseModule: Partial<ModuleData> = { id, type };
     
-    // Add default properties based on type
     switch (type) {
       case ModuleType.HEADER_LOGO:
         baseModule.properties = { imageUrl: 'https://raw.githubusercontent.com/Uniper-Bulawa/dot-email-assets/main/report_logo_CO.png', align: 'right', altText: 'report_logo_CO.png' };
@@ -71,12 +77,78 @@ const App: React.FC = () => {
     }
     
     setModules(prev => [...prev, baseModule as ModuleData]);
+    setSelectedModuleId(id);
   };
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(fullHtml);
     setCopySuccess(true);
     setTimeout(() => setCopySuccess(false), 2000);
+  };
+
+  // Scroll the highlighted code into view when selection or tab changes
+  useEffect(() => {
+    if (activeTab === 'code' && selectedModuleId) {
+      setTimeout(() => {
+        const element = document.getElementById(`code-block-${selectedModuleId}`);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 100);
+    }
+  }, [activeTab, selectedModuleId]);
+
+  const renderCodeSegments = () => {
+    const segments = fullHtml.split(/(<!-- START_ID:.*? -->|<!-- END_ID:.*? -->)/);
+    let currentId: string | null = null;
+    let globalLineIndex = 1;
+    
+    return segments.map((segment, sIdx) => {
+      if (segment.startsWith('<!-- START_ID:')) {
+        currentId = segment.replace('<!-- START_ID:', '').replace(' -->', '');
+        return null;
+      }
+      if (segment.startsWith('<!-- END_ID:')) {
+        currentId = null;
+        return null;
+      }
+      if (!segment && sIdx !== 0 && sIdx !== segments.length - 1) return null;
+
+      const isSelected = currentId === selectedModuleId;
+      const lines = segment.split('\n');
+      
+      return (
+        <div 
+          key={`segment-${sIdx}`}
+          id={currentId ? `code-block-${currentId}` : undefined}
+          className={`transition-all duration-300 ${isSelected ? 'bg-blue-500/10 border-l-4 border-blue-500 -ml-4 pl-3' : ''}`}
+        >
+          {lines.map((line, lIdx) => {
+             if (sIdx === segments.length - 1 && lIdx === lines.length - 1 && !line) return null;
+             
+             const leadingSpaces = line.match(/^\s*/)?.[0].length || 0;
+
+             return (
+               <div key={lIdx} className="flex group leading-relaxed">
+                 <div className="w-10 shrink-0 text-right pr-3 select-none opacity-25 group-hover:opacity-50 text-[10px] font-mono pt-1 text-blue-300 transition-opacity">
+                   {globalLineIndex++}
+                 </div>
+                 <div 
+                    className="whitespace-pre-wrap flex-1 py-0.5 text-blue-200"
+                    style={{ 
+                        paddingLeft: `${leadingSpaces}ch`, 
+                        textIndent: `-${leadingSpaces}ch`,
+                        overflowWrap: 'anywhere'
+                    }}
+                 >
+                   {line || ' '}
+                 </div>
+               </div>
+             );
+          })}
+        </div>
+      );
+    }).filter(Boolean);
   };
 
   return (
@@ -118,6 +190,8 @@ const App: React.FC = () => {
             <ModuleItemEditor 
               key={module.id} 
               module={module} 
+              isSelected={selectedModuleId === module.id}
+              onSelect={setSelectedModuleId}
               onChange={updateModule}
               onRemove={removeModule}
               onMoveUp={(id) => moveModule(id, 'up')}
@@ -153,7 +227,7 @@ const App: React.FC = () => {
           </button>
         </div>
 
-        <div className="flex-1 overflow-auto p-8 flex justify-center items-start bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] [background-size:20px_20px]">
+        <div className="flex-1 overflow-auto p-8 flex justify-center items-start bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] [background-size:20px_20px] relative">
           {activeTab === 'preview' ? (
             <div className="w-full max-w-[720px] bg-white rounded-xl shadow-[0_0_60px_-15px_rgba(0,0,0,0.3)] overflow-hidden border border-slate-200">
               <iframe 
@@ -163,12 +237,17 @@ const App: React.FC = () => {
               />
             </div>
           ) : (
-            <div className="w-full max-w-[1000px] h-full">
-              <pre className="bg-slate-900 text-blue-300 p-6 rounded-xl overflow-auto text-sm font-mono h-[calc(100vh-160px)] shadow-[0_0_60px_-15px_rgba(0,0,0,0.5)] border border-slate-800">
-                {fullHtml}
-              </pre>
+            <div className="w-full max-w-[1000px] h-full" ref={codeContainerRef}>
+              <div className="bg-slate-900 text-blue-300 p-6 rounded-xl overflow-auto text-sm font-mono h-[calc(100vh-160px)] shadow-[0_0_60px_-15px_rgba(0,0,0,0.5)] border border-slate-800 scroll-smooth custom-scrollbar">
+                {renderCodeSegments()}
+              </div>
             </div>
           )}
+          
+          {/* Version Label */}
+          <div className="absolute bottom-4 right-6 text-[10px] font-bold text-slate-400 pointer-events-none select-none uppercase tracking-widest opacity-50">
+            v0.2.8
+          </div>
         </div>
       </div>
     </div>

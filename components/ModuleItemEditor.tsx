@@ -1,8 +1,11 @@
+
 import React, { useRef } from 'react';
 import { ModuleData, ModuleType, GridRow } from '../types';
 
 interface Props {
   module: ModuleData;
+  isSelected: boolean;
+  onSelect: (id: string) => void;
   onChange: (id: string, properties: any) => void;
   onRemove: (id: string) => void;
   onMoveUp: (id: string) => void;
@@ -34,7 +37,7 @@ const DEPT_OPTIONS = [
 
 const LOGO_BASE_URL = 'https://raw.githubusercontent.com/Uniper-Bulawa/dot-email-assets/main/report_logo_';
 
-const ModuleItemEditor: React.FC<Props> = ({ module, onChange, onRemove, onMoveUp, onMoveDown }) => {
+const ModuleItemEditor: React.FC<Props> = ({ module, isSelected, onSelect, onChange, onRemove, onMoveUp, onMoveDown }) => {
   const inputRefs = useRef<{ [key: string]: HTMLInputElement | HTMLTextAreaElement | null }>({});
   const lastFocusedCellRef = useRef<{ r: number, c: number } | null>(null);
 
@@ -70,7 +73,6 @@ const ModuleItemEditor: React.FC<Props> = ({ module, onChange, onRemove, onMoveU
 
   const handleTableCellInsert = () => {
     if (!lastFocusedCellRef.current) {
-      // If no cell is marked, fallback to clipboard
       const expression = `@{replace('!!!','VAR_NAME')}`;
       navigator.clipboard.writeText(expression);
       return;
@@ -161,21 +163,30 @@ const ModuleItemEditor: React.FC<Props> = ({ module, onChange, onRemove, onMoveU
   );
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl p-4 mb-4 shadow-sm hover:border-blue-300 transition-colors">
+    <div 
+      onClick={() => onSelect(module.id)}
+      className={`bg-white border-2 rounded-xl p-4 mb-4 transition-all cursor-pointer ${
+        isSelected 
+        ? 'border-blue-500 shadow-[0_0_15px_-5px_rgba(59,130,246,0.5)] ring-1 ring-blue-500/20' 
+        : 'border-slate-200 shadow-sm hover:border-slate-300'
+      }`}
+    >
       <div className="flex justify-between items-center mb-4 pb-2 border-b border-slate-100">
         <div className="flex items-center gap-2">
-          <span className="bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider">
+          <span className={`text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider transition-colors ${
+            isSelected ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-700'
+          }`}>
             {module.type.replace(/_/g, ' ')}
           </span>
         </div>
         <div className="flex gap-1">
-          <button onClick={() => onMoveUp(module.id)} className="p-1.5 hover:bg-slate-100 rounded text-slate-500 transition-colors" title="Move Up">
+          <button onClick={(e) => { e.stopPropagation(); onMoveUp(module.id); }} className="p-1.5 hover:bg-slate-100 rounded text-slate-500 transition-colors" title="Move Up">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 15l7-7 7 7" /></svg>
           </button>
-          <button onClick={() => onMoveDown(module.id)} className="p-1.5 hover:bg-slate-100 rounded text-slate-500 transition-colors" title="Move Down">
+          <button onClick={(e) => { e.stopPropagation(); onMoveDown(module.id); }} className="p-1.5 hover:bg-slate-100 rounded text-slate-500 transition-colors" title="Move Down">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
           </button>
-          <button onClick={() => onRemove(module.id)} className="p-1.5 hover:bg-red-50 text-red-400 rounded transition-colors" title="Remove">
+          <button onClick={(e) => { e.stopPropagation(); onRemove(module.id); }} className="p-1.5 hover:bg-red-50 text-red-400 rounded transition-colors" title="Remove">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
           </button>
         </div>
@@ -310,10 +321,10 @@ const ModuleItemEditor: React.FC<Props> = ({ module, onChange, onRemove, onMoveU
                   <span className="font-mono text-[10px] opacity-70">&lt;/&gt;</span>
                   Insert Expr.
                 </button>
-                <button onClick={addColumn} className="text-[9px] bg-blue-50 text-blue-600 px-2 py-1 rounded border border-blue-100 font-bold hover:bg-blue-100 transition-colors">
+                <button onClick={(e) => { e.stopPropagation(); addColumn(); }} className="text-[9px] bg-blue-50 text-blue-600 px-2 py-1 rounded border border-blue-100 font-bold hover:bg-blue-100 transition-colors">
                   + COL
                 </button>
-                <button onClick={addGridRow} className="text-[9px] bg-blue-50 text-blue-600 px-2 py-1 rounded border border-blue-100 font-bold hover:bg-blue-100 transition-colors">
+                <button onClick={(e) => { e.stopPropagation(); addGridRow(); }} className="text-[9px] bg-blue-50 text-blue-600 px-2 py-1 rounded border border-blue-100 font-bold hover:bg-blue-100 transition-colors">
                   + ROW
                 </button>
               </div>
@@ -344,7 +355,7 @@ const ModuleItemEditor: React.FC<Props> = ({ module, onChange, onRemove, onMoveU
                             />
                             {rIdx === 0 && (
                               <button 
-                                onClick={() => removeColumn(cIdx)} 
+                                onClick={(e) => { e.stopPropagation(); removeColumn(cIdx); }} 
                                 className="absolute -top-1.5 -right-1.5 bg-white shadow-md border border-red-100 text-red-400 hover:text-red-600 rounded-full p-0.5 opacity-0 group-hover/col:opacity-100 transition-opacity z-10"
                                 title="Remove Column"
                               >
@@ -354,7 +365,7 @@ const ModuleItemEditor: React.FC<Props> = ({ module, onChange, onRemove, onMoveU
                           </div>
                         );
                       })}
-                      <button onClick={() => removeGridRow(rIdx)} className="text-red-300 hover:text-red-500 transition-colors p-1" title="Remove Row">
+                      <button onClick={(e) => { e.stopPropagation(); removeGridRow(rIdx); }} className="text-red-300 hover:text-red-500 transition-colors p-1" title="Remove Row">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
                       </button>
                     </div>
