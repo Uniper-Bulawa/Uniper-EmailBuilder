@@ -5,7 +5,11 @@ export enum ModuleType {
   IMAGE = 'IMAGE',
   TABLE = 'TABLE',
   BUTTON = 'BUTTON',
-  SIGNATURE = 'SIGNATURE'
+  SIGNATURE = 'SIGNATURE',
+  DELIVERY_PHASE = 'DELIVERY_PHASE',
+  KPI_CARDS = 'KPI_CARDS',
+  TWO_COLUMN = 'TWO_COLUMN',
+  CHECKLIST = 'CHECKLIST'
 }
 
 export interface TableRow {
@@ -17,17 +21,31 @@ export interface GridRow {
   cells: string[];
 }
 
+export interface KpiMetric {
+  value: string;
+  label: string;
+  color: string;
+}
+
+export interface ChecklistItem {
+  text: string;
+  icon: 'empty' | 'checked' | 'blue' | 'black' | 'circle' | 'disc' | 'arrow' | 'star';
+}
+
 export interface ModuleData {
   id: string;
   type: ModuleType;
+  section: 'inside' | 'outside';
   properties: {
     imageUrl?: string;
+    imageWidth?: string;
+    imageHeight?: string;
     title?: string;
     content?: string;
     url?: string;
     buttonText?: string;
-    rows?: TableRow[]; // Legacy, kept for compatibility if needed during migration
-    headers?: string[]; // Legacy, kept for compatibility if needed
+    rows?: TableRow[];
+    headers?: string[];
     gridRows?: GridRow[];
     hasColumnHeaders?: boolean;
     hasRowHeaders?: boolean;
@@ -36,6 +54,11 @@ export interface ModuleData {
     color?: string;
     secondaryColor?: string;
     altText?: string;
+    // New properties
+    selectedPhase?: string;
+    metrics?: KpiMetric[];
+    imagePosition?: 'left' | 'right';
+    checklistItems?: ChecklistItem[];
   };
 }
 

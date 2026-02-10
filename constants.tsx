@@ -4,6 +4,7 @@ export const DEFAULT_MODULES: ModuleData[] = [
   {
     id: 'm1',
     type: ModuleType.HEADER_LOGO,
+    section: 'inside',
     properties: {
       imageUrl: 'https://raw.githubusercontent.com/Uniper-Bulawa/dot-email-assets/main/report_logo_CO.png',
       align: 'right',
@@ -13,42 +14,69 @@ export const DEFAULT_MODULES: ModuleData[] = [
   {
     id: 'm2',
     type: ModuleType.BANNER,
+    section: 'inside',
     properties: {
       title: 'USE CASE UPDATE',
       color: '#0078DC'
     }
   },
   {
+    id: 'm-dp',
+    type: ModuleType.DELIVERY_PHASE,
+    section: 'inside',
+    properties: {
+      selectedPhase: 'Develop'
+    }
+  },
+  {
     id: 'm3',
     type: ModuleType.TEXT,
+    section: 'inside',
     properties: {
-      content: "Dear @{replace('!!!','Recipient')},\n\nHere is the query result for the best digitalization team out there:"
+      content: "Dear @{replace('!!!','Recipient')},\n\nWe are pleased to provide you with the latest metrics regarding the digitalization progress.",
+      align: 'left'
+    }
+  },
+  {
+    id: 'm-kpi',
+    type: ModuleType.KPI_CARDS,
+    section: 'inside',
+    properties: {
+      metrics: [
+        { value: '1.2M', label: 'Savings', color: '#00944A' },
+        { value: '+15%', label: 'Efficiency', color: '#ED8C1C' },
+        { value: 'Active', label: 'Status', color: '#0078DC' }
+      ]
     }
   },
   {
     id: 'm4',
     type: ModuleType.IMAGE,
+    section: 'inside',
     properties: {
       imageUrl: 'cid:report.png',
-      altText: 'report.png'
+      altText: 'report.png',
+      align: 'center'
     }
   },
   {
     id: 'm5',
     type: ModuleType.TABLE,
+    section: 'inside',
     properties: {
       hasColumnHeaders: false,
       hasRowHeaders: true,
       gridRows: [
         { cells: ['Team Name', 'DOT'] },
         { cells: ['Dept Code', 'P_OI1-A5'] },
-        { cells: ['Description:', 'Lorem ipsum dolor sit amet, consetetur sadipscing elitr.'] }
+        { cells: ['Description:', 'Detailed status report attached.'] }
       ]
     }
   },
   {
     id: 'm6',
     type: ModuleType.BUTTON,
+    section: 'inside',
     properties: {
       content: 'Please visit out platform for any digitalization related questions:',
       buttonText: 'CO Digi Guide',
@@ -59,6 +87,7 @@ export const DEFAULT_MODULES: ModuleData[] = [
   {
     id: 'm7',
     type: ModuleType.BANNER,
+    section: 'inside',
     properties: {
       title: '',
       color: '#0078DC'
@@ -67,6 +96,7 @@ export const DEFAULT_MODULES: ModuleData[] = [
   {
     id: 'm8',
     type: ModuleType.SIGNATURE,
+    section: 'outside',
     properties: {
       content: 'This is an automatically generated email.',
       imageUrl: 'https://raw.githubusercontent.com/Uniper-Bulawa/dot-email-assets/main/report_logo_DOT.png',
