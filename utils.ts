@@ -24,7 +24,7 @@ const getChecklistIcon = (type: ChecklistItem['icon']) => {
         case 'disc': return '●';
         case 'arrow': return '➔';
         case 'star': return '★';
-        case 'blue': return '<span style="color: #0078DC;">■</span>';
+        case 'blue': return '<span class="checklist-blue" style="color: #0078DC;">■</span>';
         case 'black': return '■';
         default: return '•';
     }
@@ -36,8 +36,7 @@ export const renderModuleToHtml = (module: ModuleData, prevModuleType?: ModuleTy
 
     switch (type) {
         case ModuleType.HEADER_LOGO:
-            // Reduced margin-top from 40px to 20px
-            content = `<div style="text-align: ${properties.align || 'right'}; margin-bottom: 20px; margin-top: 20px;">
+            content = `<div class="header-logo" style="text-align: ${properties.align || 'right'}; margin-bottom: 20px; margin-top: 20px;">
     <img src="${properties.imageUrl}" width="auto" alt="${properties.altText || getFileName(properties.imageUrl)}" style="display: inline-block; width: auto; max-width: 640px; height: auto;">
 </div>`;
             break;
@@ -45,9 +44,6 @@ export const renderModuleToHtml = (module: ModuleData, prevModuleType?: ModuleTy
         case ModuleType.BANNER:
             const isFollowedByDP = nextModuleType === ModuleType.DELIVERY_PHASE;
             const bannerRadius = isFollowedByDP ? '12px 12px 0 0' : '12px';
-            
-            // Outlook Desktop Fix: v:roundrect rounds all 4 corners. 
-            // If followed by DP, we use v:rect (square) for a flush connection in the Reading Pane.
             const vmlTag = isFollowedByDP ? 'v:rect' : 'v:roundrect';
             const arcSize = isFollowedByDP ? '' : 'arcsize="24%"';
 
@@ -56,8 +52,8 @@ export const renderModuleToHtml = (module: ModuleData, prevModuleType?: ModuleTy
     <w:anchorlock/>
     <center>
 <![endif]-->
-<div style="margin-top: 25px; text-align: center; padding: 12px; background-color: ${properties.color}; border-radius: ${bannerRadius};">
-    <h2 style="color: #ffffff; margin: 0; font-size: 20px; font-weight: 600;">${properties.title}</h2>
+<div class="banner-bg" style="margin-top: 25px; text-align: center; padding: 12px; background-color: ${properties.color}; border-radius: ${bannerRadius};">
+    <h2 class="banner-text" style="color: #ffffff; margin: 0; font-size: 20px; font-weight: 600;">${properties.title}</h2>
 </div>
 <!--[if mso]>
     </center>
@@ -68,7 +64,7 @@ export const renderModuleToHtml = (module: ModuleData, prevModuleType?: ModuleTy
         case ModuleType.TEXT:
             const textAlign = properties.align || 'left';
             const formattedText = (properties.content || '').replace(/\n/g, '<br>');
-            content = `<div style="margin-top: 25px; margin-bottom: 15px; font-size: 15px; text-align: ${textAlign}; line-height: 1.5;">${formattedText}</div>`;
+            content = `<div class="text-block" style="margin-top: 25px; margin-bottom: 15px; font-size: 15px; text-align: ${textAlign}; line-height: 1.5;">${formattedText}</div>`;
             break;
 
         case ModuleType.IMAGE:
@@ -76,7 +72,6 @@ export const renderModuleToHtml = (module: ModuleData, prevModuleType?: ModuleTy
             const h = formatDimension(properties.imageHeight);
             const imgAlign = properties.align || 'center';
             const margin = imgAlign === 'center' ? '0 auto' : (imgAlign === 'right' ? '0 0 0 auto' : '0');
-            // Table width: 100% provides context for percentage resizing
             content = `<table cellspacing="0" cellpadding="0" border="0" style="width: 100%; max-width: 640px; margin: 25px auto;">
     <tbody>
         <tr>
@@ -92,13 +87,14 @@ export const renderModuleToHtml = (module: ModuleData, prevModuleType?: ModuleTy
             const rows = properties.gridRows || [];
             const hasColumnHeaders = !!properties.hasColumnHeaders;
             const hasRowHeaders = !!properties.hasRowHeaders;
-            const tableBorderColor = '#EEEEEE'; // More subtle color for better dark mode compatibility
+            const tableBorderColor = '#EEEEEE';
 
             const rowsHtml = rows.map((row, rIdx) => {
                 const isHeaderRow = hasColumnHeaders && rIdx === 0;
                 const cellsHtml = row.cells.map((cell, cIdx) => {
                     const isHeaderCell = (hasRowHeaders && cIdx === 0) || isHeaderRow;
                     const tag = isHeaderCell ? 'th' : 'td';
+                    const cellClass = isHeaderCell ? 'table-header-cell' : 'table-cell';
                     
                     let cellStyle = `padding: 12px; border: 1px solid ${tableBorderColor}; text-align: left;`;
                     if (isHeaderRow) {
@@ -109,12 +105,12 @@ export const renderModuleToHtml = (module: ModuleData, prevModuleType?: ModuleTy
                         cellStyle += ' background-color: #f9f9f9;';
                     }
 
-                    return `\n            <${tag} style="${cellStyle}">${cell}</${tag}>`;
+                    return `\n            <${tag} class="${cellClass}" style="${cellStyle}">${cell}</${tag}>`;
                 }).join('');
                 return `\n        <tr>${cellsHtml}\n        </tr>`;
             }).join('');
 
-            content = `<table cellspacing="0" cellpadding="0" border="0" style="width: 100%; max-width: 640px; margin: 25px auto; border-collapse: collapse; font-size: 14px; border: 1px solid ${tableBorderColor}; border-radius: 8px; overflow: hidden;">
+            content = `<table class="content-table" cellspacing="0" cellpadding="0" border="0" style="width: 100%; max-width: 640px; margin: 25px auto; border-collapse: collapse; font-size: 14px; border: 1px solid ${tableBorderColor}; border-radius: 8px; overflow: hidden;">
     <tbody>${rowsHtml}
     </tbody>
 </table>`;
@@ -122,16 +118,16 @@ export const renderModuleToHtml = (module: ModuleData, prevModuleType?: ModuleTy
 
         case ModuleType.BUTTON:
             const formattedButtonContent = (properties.content || '').replace(/\n/g, '<br>');
-            content = `<div style="margin-top: 25px; text-align: center; padding: 20px; background-color: #f9f9f9; border-radius: 8px;">
-    <p style="margin: 0 0 15px 0; font-size: 13px; color: #666; line-height: 1.5;">${formattedButtonContent}</p>
-    <a href="${properties.url}" style="background-color: ${properties.color || '#0078DC'}; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block; font-size: 14px; transition: all 0.3s ease;">${properties.buttonText}</a>
+            content = `<div class="button-section" style="margin-top: 25px; text-align: center; padding: 20px; background-color: #f9f9f9; border-radius: 8px;">
+    <p class="button-hint" style="margin: 0 0 15px 0; font-size: 13px; color: #666; line-height: 1.5;">${formattedButtonContent}</p>
+    <a href="${properties.url}" class="button-link" style="background-color: ${properties.color || '#0078DC'}; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block; font-size: 14px; transition: all 0.3s ease;">${properties.buttonText}</a>
 </div>`;
             break;
 
         case ModuleType.SIGNATURE:
             const ratingBaseUrl = 'https://apps.powerapps.com/play/e/default-db8e2f82-8a37-4c09-b7de-ed06547b5a20/a/8d6aa8c2-432f-47d4-a201-803bfee1702e?tenantId=db8e2f82-8a37-4c09-b7de-ed06547b5a20&hint=221a9b25-893f-4de1-9ff0-d792206ec37c&sourcetime=1706559731201&source=portal&HideNavBar=true&Rating=';
             
-            const ratingHtml = properties.hasStarRating ? `\n<div style="text-align: center; margin-top: 15px; margin-bottom: 40px;">
+            const ratingHtml = properties.hasStarRating ? `\n<div class="rating-section" style="text-align: center; margin-top: 15px; margin-bottom: 40px;">
     <p style="font-size: 10px; font-weight: bold; color: #C6C6C6; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 1px;">RATE YOUR EXPERIENCE</p>
     <div style="font-size: 28px; line-height: 1;">
         <a href="${ratingBaseUrl}1" title="1/5" style="text-decoration: none; color: #C6C6C6;">★</a>
@@ -143,36 +139,33 @@ export const renderModuleToHtml = (module: ModuleData, prevModuleType?: ModuleTy
 </div>` : '';
 
             const formattedSigContent = (properties.content || '').replace(/\n/g, '<br>');
-            content = `<p style="font-size: 11px; color: #C6C6C6; text-align: center; margin-top: 20px; line-height: 1.5;">
+            content = `<p class="signature-text" style="font-size: 11px; color: #C6C6C6; text-align: center; margin-top: 20px; line-height: 1.5;">
     ${formattedSigContent}
 </p>
-<div style="text-align: center; margin-top: 40px; ${!properties.hasStarRating ? 'margin-bottom: 40px;' : ''}">
+<div class="signature-logo" style="text-align: center; margin-top: 40px; ${!properties.hasStarRating ? 'margin-bottom: 40px;' : ''}">
     <img src="${properties.imageUrl}" alt="Footer Logo" style="display: inline-block; width: auto; max-width: 640px; height: 40px;">
 </div>${ratingHtml}`;
             break;
 
         case ModuleType.DELIVERY_PHASE:
             const phases = ['L3 Prio', 'Assess', 'Design', 'Plan', 'Develop', 'Document', 'Train', 'Handover', 'Live'];
-            const gridColor = '#E0E0E0'; // Subtle gray for better dark mode handling than pure white
+            const gridColor = '#E0E0E0';
             const phaseCells = phases.map((p, idx) => {
                 const isActive = p === properties.selectedPhase;
                 const bg = isActive ? '#0078DC' : '#f2f2f2';
                 const color = isActive ? '#ffffff' : '#999999';
                 const weight = isActive ? 'bold' : 'normal';
-                
-                // Remove border-right for the last cell to remove the outer right border
                 const borderStyle = idx === phases.length - 1 ? '' : `border-right: 1px solid ${gridColor};`;
+                const cellClass = isActive ? 'phase-cell phase-active' : 'phase-cell';
                 
-                return `<td style="padding: 10px 4px; background-color: ${bg}; color: ${color}; font-size: 10px; text-align: center; font-weight: ${weight}; ${borderStyle}">${p}</td>`;
+                return `<td class="${cellClass}" style="padding: 10px 4px; background-color: ${bg}; color: ${color}; font-size: 10px; text-align: center; font-weight: ${weight}; ${borderStyle}">${p}</td>`;
             }).join('');
             
             const isFollowedBanner = prevModuleType === ModuleType.BANNER;
             const dpRadius = isFollowedBanner ? '0 0 12px 12px' : '12px';
-            
-            // Outlook Fix: Ensure the table is perfectly aligned if it's following a banner
             const dpMarginTop = isFollowedBanner ? '0' : '25px';
 
-            content = `<table cellspacing="0" cellpadding="0" border="0" style="width: 100%; max-width: 640px; margin: ${dpMarginTop} auto 25px auto; border-collapse: collapse; overflow: hidden; border-radius: ${dpRadius};">
+            content = `<table class="phase-table" cellspacing="0" cellpadding="0" border="0" style="width: 100%; max-width: 640px; margin: ${dpMarginTop} auto 25px auto; border-collapse: collapse; overflow: hidden; border-radius: ${dpRadius};">
     <tbody>
         <tr>
             ${phaseCells}
@@ -185,9 +178,9 @@ export const renderModuleToHtml = (module: ModuleData, prevModuleType?: ModuleTy
             const metrics = properties.metrics || [];
             const metricCells = metrics.map(m => `
             <td style="padding: 10px; width: ${100/metrics.length}%;">
-                <div style="background-color: #ffffff; border: 1px solid #eeeeee; border-top: 4px solid ${m.color}; padding: 15px; text-align: center; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
-                    <div style="font-size: 24px; font-weight: bold; color: ${m.color}; margin-bottom: 4px;">${m.value}</div>
-                    <div style="font-size: 11px; color: #666666; text-transform: uppercase; letter-spacing: 0.5px;">${m.label}</div>
+                <div class="kpi-card" style="background-color: #ffffff; border: 1px solid #eeeeee; border-top: 4px solid ${m.color}; padding: 15px; text-align: center; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                    <div class="kpi-value" style="font-size: 24px; font-weight: bold; color: ${m.color}; margin-bottom: 4px;">${m.value}</div>
+                    <div class="kpi-label" style="font-size: 11px; color: #666666; text-transform: uppercase; letter-spacing: 0.5px;">${m.label}</div>
                 </div>
             </td>`).join('');
             content = `<table cellspacing="0" cellpadding="0" border="0" style="width: 100%; max-width: 640px; margin: 25px auto;">
@@ -207,7 +200,7 @@ export const renderModuleToHtml = (module: ModuleData, prevModuleType?: ModuleTy
     <img src="${properties.imageUrl}" width="100%" style="display: block; width: 100%; height: auto; border-radius: 6px;">
 </td>`;
             const twoColTextPart = `<td style="width: 55%; padding: 10px; vertical-align: middle;">
-    <div style="font-size: 15px; color: #333333; line-height: 1.5;">${formattedTwoColContent}</div>
+    <div class="text-block" style="font-size: 15px; color: #333333; line-height: 1.5;">${formattedTwoColContent}</div>
 </td>`;
             content = `<table cellspacing="0" cellpadding="0" border="0" style="width: 100%; max-width: 640px; margin: 25px auto;">
     <tbody>
@@ -221,14 +214,14 @@ export const renderModuleToHtml = (module: ModuleData, prevModuleType?: ModuleTy
         case ModuleType.CHECKLIST:
             const checklistHtml = (properties.checklistItems || []).map(item => `
         <tr>
-            <td style="padding: 4px 6px 4px 20px; vertical-align: middle; font-size: 18px; line-height: 1; width: 24px; text-align: center;">
+            <td class="checklist-icon-cell" style="padding: 4px 6px 4px 20px; vertical-align: middle; font-size: 18px; line-height: 1; width: 24px; text-align: center;">
                 ${getChecklistIcon(item.icon)}
             </td>
-            <td style="padding: 4px 0; vertical-align: middle; font-size: 15px; color: #333333;">
+            <td class="checklist-text-cell" style="padding: 4px 0; vertical-align: middle; font-size: 15px; color: #333333;">
                 ${item.text}
             </td>
         </tr>`).join('');
-            content = `<table cellspacing="0" cellpadding="0" border="0" style="width: 100%; max-width: 640px; margin: 25px auto;">
+            content = `<table class="checklist-table" cellspacing="0" cellpadding="0" border="0" style="width: 100%; max-width: 640px; margin: 25px auto;">
     <tbody>
         ${checklistHtml}
     </tbody>
@@ -236,7 +229,7 @@ export const renderModuleToHtml = (module: ModuleData, prevModuleType?: ModuleTy
             break;
 
         case ModuleType.LEGAL:
-            content = `<div style="margin-top: 25px; margin-bottom: 25px; font-size: 11px; color: #C6C6C6; text-align: left; line-height: 1.5;">
+            content = `<div class="legal-block" style="margin-top: 25px; margin-bottom: 25px; font-size: 11px; color: #C6C6C6; text-align: left; line-height: 1.5;">
     Uniper Global Commodities SE, Holzstraße 6, 40221 Düsseldorf, Germany<br>
     Sitz/Registered Office: Düsseldorf, Amtsgericht/DistrictCourt Düsseldorf HRB 61123<br>
     Vorsitzender des Aufsichtsrats/Chairman of the Supervisory Board: ${properties.chairman || '[CHAIRMAN]'}<br>
@@ -265,18 +258,56 @@ export const generateFullHtml = (modules: ModuleData[], isDarkMode: boolean = fa
     const insideHtml = renderList(insideModules);
     const outsideHtml = renderList(outsideModules);
 
-    // Dark Mode Simulation: Inverts everything and then counter-inverts images to simulate Outlook's filter logic.
+    // Precise Dark Mode Simulation for Outlook Preview
     const darkSimulationStyles = isDarkMode ? `
-        html, body { 
-            background-color: #2d2d2d !important; 
-            filter: invert(100%) hue-rotate(180deg); 
+        body { background-color: #292929 !important; }
+        .main-container { 
+            background-color: #292929 !important; 
+            box-shadow: 0 4px 30px rgba(0,0,0,0.3) !important;
+            border: 0px solid #333 !important;
         }
-        img, .no-invert { 
-            filter: invert(100%) hue-rotate(180deg); 
+        
+        /* General Text Color, Table Body Text, Image Alt Text - Enforce #D7D7D7 */
+        .text-block, .checklist-text-cell, .button-hint, .kpi-label, .legal-block, .table-cell, img {
+            color: #D7D7D7 !important;
         }
-        .main-container {
-            background-color: #ffffff !important;
+
+        /* Specific Blue Brand Elements (Enforced #0078DC) */
+        .checklist-blue, .table-header-cell, .main-container a:not(.button-link) {
+            color: #0078DC !important;
         }
+
+        /* Banners & Highlights (Enforced #0078DC) */
+        .banner-bg, .phase-active { background-color: #0078DC !important; }
+        .banner-text, .button-link { color: #FFFFFF !important; }
+
+        /* Tables & Grids - Enforced #EEEEEE */
+        .content-table, .content-table td, .content-table th { border-color: #EEEEEE !important; }
+        .table-header-cell { background-color: #2F2F2F !important; }
+        .table-cell { background-color: #2C2C2C !important; }
+        
+        /* Modules with secondary backgrounds - Maintain accent borders and semantic values */
+        .button-section, .kpi-card { 
+            background-color: #2C2C2C !important;
+        }
+        /* Button module has no border in dark mode */
+        .button-section { border: none !important; }
+        
+        .kpi-card { 
+            border-left: 1px solid #3d3d3d !important; 
+            border-right: 1px solid #3d3d3d !important; 
+            border-bottom: 1px solid #3d3d3d !important; 
+        }
+        
+        /* Phase Grid - Enforced #E0E0E0 */
+        .phase-table { border-color: #E0E0E0 !important; }
+        .phase-cell:not(.phase-active) { background-color: #2F2F2F !important; color: #777 !important; border-color: #E0E0E0 !important; }
+        
+        /* KPI values should maintain their custom semantic colors */
+        .kpi-value { opacity: 1 !important; }
+        
+        /* Prevent inversion of images */
+        img { opacity: 0.9; }
     ` : '';
 
     return `<!DOCTYPE html>
@@ -284,13 +315,13 @@ export const generateFullHtml = (modules: ModuleData[], isDarkMode: boolean = fa
 <head>
     <meta charset="UTF-8">
     <style>
-        body { margin: 0; padding: 0; }
+        body { margin: 0; padding: 0; transition: background-color 0.3s ease; }
         .cta-button:hover { background-color: #135B8B !important; }
         ${darkSimulationStyles}
     </style>
 </head>
-<body style="background-color: #f4f4f4; padding: 20px 0;">
-    <div class="main-container" style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 640px; margin: 40px auto 0 auto; background-color: #ffffff; color: #333; padding: 20px 20px 60px 20px; border-radius: 12px; box-shadow: 0 4px 30px rgba(0,0,0,0.06);">
+<body style="background-color: #ffffff; padding: 20px 0;">
+    <div class="main-container" style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 640px; margin: 40px auto 0 auto; background-color: #ffffff; color: #333; padding: 20px 20px 60px 20px; border-radius: 12px; box-shadow: 0 4px 30px rgba(0,0,0,0.06); transition: all 0.3s ease;">
 ${insideHtml}
     </div>
     <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 640px; margin: 40px auto 0 auto; color: #333;">

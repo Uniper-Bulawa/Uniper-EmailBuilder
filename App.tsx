@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { ModuleData, ModuleType } from './types';
 import { DEFAULT_MODULES } from './constants';
 import { generateFullHtml } from './utils';
@@ -265,7 +265,6 @@ const App: React.FC = () => {
           </div>
         </div>
         <div className="flex-1 overflow-y-auto p-4 custom-scrollbar bg-slate-50/30">
-          {/* Main Body Section */}
           <div className="mb-8">
             <h3 className="text-[10px] font-black text-slate-400 mb-3 ml-2 tracking-widest uppercase flex items-center gap-2">
               <span className="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
@@ -287,7 +286,6 @@ const App: React.FC = () => {
             )}
           </div>
 
-          {/* Outside Body Section */}
           <div className="mb-8">
             <h3 className="text-[10px] font-black text-slate-400 mb-3 ml-2 tracking-widest uppercase flex items-center gap-2">
               <span className="w-1.5 h-1.5 bg-slate-300 rounded-full"></span>
@@ -318,7 +316,6 @@ const App: React.FC = () => {
               <button onClick={() => setActiveTab('code')} className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${activeTab === 'code' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>HTML</button>
             </div>
             
-            {/* Dark Mode Segmented Toggle */}
             {activeTab === 'preview' && (
               <div className="flex items-center gap-3 ml-4 pl-4 border-l border-slate-200">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Mode</span>
@@ -344,9 +341,15 @@ const App: React.FC = () => {
             {copySuccess ? 'Copied!' : 'Copy Code'}
           </button>
         </div>
-        <div className="flex-1 overflow-auto p-8 flex justify-center items-start bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] [background-size:20px_20px] relative">
+        <div 
+          className="flex-1 overflow-auto p-8 flex justify-center items-start relative bg-[#f8fafc]"
+          style={{
+            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23cbd5e1' fill-opacity='0.15'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+            backgroundRepeat: 'repeat'
+          }}
+        >
           {activeTab === 'preview' ? (
-            <div className="w-full max-w-[1000px] bg-white rounded-xl shadow-[0_4px_30px_rgba(0,0,0,0.06)] overflow-hidden border border-slate-200">
+            <div className="w-full max-w-[1000px] bg-white rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.08)] overflow-hidden border border-slate-200">
               <iframe srcDoc={previewHtml} className="w-full h-[calc(100vh-160px)] border-none" title="Email Preview" />
             </div>
           ) : (
