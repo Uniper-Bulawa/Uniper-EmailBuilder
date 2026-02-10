@@ -267,8 +267,8 @@ export const generateFullHtml = (modules: ModuleData[], isDarkMode: boolean = fa
             border: 0px solid #333 !important;
         }
         
-        /* General Text Color, Table Body Text, Image Alt Text - Enforce #D7D7D7 */
-        .text-block, .checklist-text-cell, .button-hint, .kpi-label, .legal-block, .table-cell, img {
+        /* General Text Color, Table Body Text, Image Alt Text, Non-Blue Checklist Icons - Enforce #D7D7D7 */
+        .text-block, .checklist-text-cell, .checklist-icon-cell, .button-hint, .kpi-label, .legal-block, .table-cell, img {
             color: #D7D7D7 !important;
         }
 

@@ -7,6 +7,7 @@ interface Props {
   onSelect: (id: string) => void;
   onChange: (id: string, properties: any) => void;
   onRemove: (id: string) => void;
+  onDuplicate: (id: string) => void;
   onMoveUp: (id: string) => void;
   onMoveDown: (id: string) => void;
 }
@@ -48,7 +49,7 @@ const KPI_COLORS = ['#00944A', '#ED8C1C', '#E6252E', '#0078DC'];
  * E -> Insert Expression (@{replace('!!!','REFERENCE')})
  */
 
-const ModuleItemEditor: React.FC<Props> = ({ module, isSelected, onSelect, onChange, onRemove, onMoveUp, onMoveDown }) => {
+const ModuleItemEditor: React.FC<Props> = ({ module, isSelected, onSelect, onChange, onRemove, onDuplicate, onMoveUp, onMoveDown }) => {
   const inputRefs = useRef<{ [key: string]: HTMLInputElement | HTMLTextAreaElement | null }>({});
   const lastFocusedKeyRef = useRef<string | null>(null);
   const lastFocusedCellRef = useRef<{ r: number, c: number } | null>(null);
@@ -267,6 +268,7 @@ const ModuleItemEditor: React.FC<Props> = ({ module, isSelected, onSelect, onCha
         <div className="flex gap-1">
           <button onClick={(e) => { e.stopPropagation(); onMoveUp(module.id); }} title="Move Up" className="p-1.5 hover:bg-slate-100 rounded text-slate-500 outline-none"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 15l7-7 7 7" /></svg></button>
           <button onClick={(e) => { e.stopPropagation(); onMoveDown(module.id); }} title="Move Down" className="p-1.5 hover:bg-slate-100 rounded text-slate-500 outline-none"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg></button>
+          <button onClick={(e) => { e.stopPropagation(); onDuplicate(module.id); }} title="Duplicate" className="p-1.5 hover:bg-blue-50 text-blue-400 rounded outline-none"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" /></svg></button>
           <button onClick={(e) => { e.stopPropagation(); onRemove(module.id); }} title="Delete" className="p-1.5 hover:bg-red-50 text-red-400 rounded outline-none"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
         </div>
       </div>
@@ -477,6 +479,7 @@ const ModuleItemEditor: React.FC<Props> = ({ module, isSelected, onSelect, onCha
               <label className="block text-[10px] font-bold text-slate-400 uppercase">Metrics</label>
               <button 
                 type="button"
+                // Fixed: replaced undefined 'fieldKey' with handleGlobalInsertExpression()
                 onMouseDown={(e) => { e.preventDefault(); handleGlobalInsertExpression(); }}
                 className="text-[9px] text-slate-400 hover:text-blue-500 font-bold transition-colors flex items-center gap-1 cursor-pointer outline-none"
               >

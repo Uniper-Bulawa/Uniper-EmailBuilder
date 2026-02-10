@@ -4,7 +4,7 @@ import { DEFAULT_MODULES } from './constants';
 import { generateFullHtml } from './utils';
 import ModuleItemEditor from './components/ModuleItemEditor';
 
-const APP_VERSION = 'v0.7.0';
+const APP_VERSION = 'v0.7.1';
 
 const App: React.FC = () => {
   const [modules, setModules] = useState<ModuleData[]>(DEFAULT_MODULES);
@@ -33,6 +33,27 @@ const App: React.FC = () => {
       return filtered;
     });
   }, [selectedModuleId]);
+
+  const duplicateModule = useCallback((id: string) => {
+    setModules(prev => {
+      const index = prev.findIndex(m => m.id === id);
+      if (index === -1) return prev;
+      
+      const sourceModule = prev[index];
+      const newId = `m-dup-${Date.now()}`;
+      const newModule: ModuleData = {
+        ...sourceModule,
+        id: newId,
+        // Deep copy properties to ensure no shared references
+        properties: JSON.parse(JSON.stringify(sourceModule.properties))
+      };
+      
+      const newModules = [...prev];
+      newModules.splice(index + 1, 0, newModule);
+      setSelectedModuleId(newId);
+      return newModules;
+    });
+  }, []);
 
   const moveModule = useCallback((id: string, direction: 'up' | 'down') => {
     setModules(prev => {
@@ -278,6 +299,7 @@ const App: React.FC = () => {
                 onSelect={setSelectedModuleId}
                 onChange={updateModule}
                 onRemove={removeModule}
+                onDuplicate={duplicateModule}
                 onMoveUp={(id) => moveModule(id, 'up')}
                 onMoveDown={(id) => moveModule(id, 'down')}
               />
@@ -299,6 +321,7 @@ const App: React.FC = () => {
                 onSelect={setSelectedModuleId}
                 onChange={updateModule}
                 onRemove={removeModule}
+                onDuplicate={duplicateModule}
                 onMoveUp={(id) => moveModule(id, 'up')}
                 onMoveDown={(id) => moveModule(id, 'down')}
               />
