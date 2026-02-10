@@ -133,14 +133,12 @@ const ModuleItemEditor: React.FC<Props> = ({ module, isSelected, onSelect, onCha
     } else if (type === 'strike') {
       wrappedText = `<s>${selectedText}</s>`;
     } else if (type === 'link') {
-      // Changed to direct insertion per user request
       wrappedText = `<a href="URL" style="color:#0078DC;">${selectedText || 'DISPLAY TEXT'}</a>`;
     }
 
     const newValue = currentValue.substring(0, start) + wrappedText + currentValue.substring(end);
     setValueForKey(key, newValue);
 
-    // Using a shorter timeout as no prompt window is opened
     setTimeout(() => {
       const field = inputRefs.current[key];
       if (field) {
@@ -166,7 +164,6 @@ const ModuleItemEditor: React.FC<Props> = ({ module, isSelected, onSelect, onCha
     };
 
     if (formatMap[code]) {
-      // CRITICAL: Block default browser behavior (especially for Ctrl+K in Edge/Chrome)
       e.preventDefault();
       e.stopPropagation();
       handleFormatting(key, formatMap[code]);
@@ -274,7 +271,7 @@ const ModuleItemEditor: React.FC<Props> = ({ module, isSelected, onSelect, onCha
       </div>
 
       <div className="space-y-4">
-        {/* Alignment Buttons for specific types */}
+        {/* Alignment Buttons */}
         {(module.type === ModuleType.HEADER_LOGO || module.type === ModuleType.TEXT || module.type === ModuleType.IMAGE) && (
           <div>
             <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Alignment</label>
@@ -301,7 +298,86 @@ const ModuleItemEditor: React.FC<Props> = ({ module, isSelected, onSelect, onCha
           </div>
         )}
 
-        {/* Core Properties */}
+        {/* Two Column Logic */}
+        {module.type === ModuleType.TWO_COLUMN && (
+          <div className="space-y-4">
+            {/* Column 1 */}
+            <div className="p-3 bg-slate-50 rounded-lg border border-[#D7E5FC] shadow-inner">
+               <div className="flex justify-between items-center mb-2">
+                 <label className="block text-[10px] font-black text-slate-500 uppercase">Column 1</label>
+                 <div className="flex bg-slate-200 p-1 rounded-md">
+                    <button onClick={() => updateProp('col1Type', 'text')} className={`px-2 py-0.5 text-[9px] font-bold rounded ${(module.properties.col1Type || 'image') === 'text' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500'}`}>TEXT</button>
+                    <button onClick={() => updateProp('col1Type', 'image')} className={`px-2 py-0.5 text-[9px] font-bold rounded ${(module.properties.col1Type || 'image') === 'image' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500'}`}>IMAGE</button>
+                 </div>
+               </div>
+               {(module.properties.col1Type || 'image') === 'text' ? (
+                 <div>
+                   {renderLabelWithHelper("Col 1 Text", "col1Text")}
+                   <textarea 
+                     ref={el => { inputRefs.current['col1Text'] = el; }} 
+                     rows={3} 
+                     value={module.properties.col1Text || module.properties.content || ''} 
+                     onFocus={() => { lastFocusedKeyRef.current = 'col1Text'; }}
+                     onKeyDown={(e) => handleKeyDown(e, 'col1Text')}
+                     onChange={(e) => updateProp('col1Text', e.target.value)} 
+                     className={`${inputClass} resize-none`} 
+                   />
+                 </div>
+               ) : (
+                 <div>
+                   {renderLabelWithHelper("Col 1 Image URL", "col1ImageUrl")}
+                   <input 
+                     ref={el => { inputRefs.current['col1ImageUrl'] = el; }} 
+                     type="text" 
+                     value={module.properties.col1ImageUrl || module.properties.imageUrl || ''} 
+                     onFocus={() => { lastFocusedKeyRef.current = 'col1ImageUrl'; }}
+                     onChange={(e) => updateProp('col1ImageUrl', e.target.value)} 
+                     className={inputClass} 
+                   />
+                 </div>
+               )}
+            </div>
+
+            {/* Column 2 */}
+            <div className="p-3 bg-slate-50 rounded-lg border border-[#D7E5FC] shadow-inner">
+               <div className="flex justify-between items-center mb-2">
+                 <label className="block text-[10px] font-black text-slate-500 uppercase">Column 2</label>
+                 <div className="flex bg-slate-200 p-1 rounded-md">
+                    <button onClick={() => updateProp('col2Type', 'text')} className={`px-2 py-0.5 text-[9px] font-bold rounded ${(module.properties.col2Type || 'text') === 'text' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500'}`}>TEXT</button>
+                    <button onClick={() => updateProp('col2Type', 'image')} className={`px-2 py-0.5 text-[9px] font-bold rounded ${(module.properties.col2Type || 'text') === 'image' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500'}`}>IMAGE</button>
+                 </div>
+               </div>
+               {(module.properties.col2Type || 'text') === 'text' ? (
+                 <div>
+                   {renderLabelWithHelper("Col 2 Text", "col2Text")}
+                   <textarea 
+                     ref={el => { inputRefs.current['col2Text'] = el; }} 
+                     rows={3} 
+                     value={module.properties.col2Text || module.properties.content || ''} 
+                     onFocus={() => { lastFocusedKeyRef.current = 'col2Text'; }}
+                     onKeyDown={(e) => handleKeyDown(e, 'col2Text')}
+                     onChange={(e) => updateProp('col2Text', e.target.value)} 
+                     className={`${inputClass} resize-none`} 
+                   />
+                 </div>
+               ) : (
+                 <div>
+                   {renderLabelWithHelper("Col 2 Image URL", "col2ImageUrl")}
+                   <input 
+                     ref={el => { inputRefs.current['col2ImageUrl'] = el; }} 
+                     type="text" 
+                     value={module.properties.col2ImageUrl || module.properties.imageUrl || ''} 
+                     onFocus={() => { lastFocusedKeyRef.current = 'col2ImageUrl'; }}
+                     onChange={(e) => updateProp('col2ImageUrl', e.target.value)} 
+                     className={inputClass} 
+                   />
+                 </div>
+               )}
+            </div>
+          </div>
+        )}
+
+        {/* Preset Logo */}
         {module.type === ModuleType.HEADER_LOGO && (
           <div>
             <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Preset Logo</label>
@@ -312,6 +388,7 @@ const ModuleItemEditor: React.FC<Props> = ({ module, isSelected, onSelect, onCha
           </div>
         )}
 
+        {/* Title */}
         {(module.properties.title !== undefined) && (
           <div>
             {renderLabelWithHelper("Title", "title")}
@@ -328,6 +405,7 @@ const ModuleItemEditor: React.FC<Props> = ({ module, isSelected, onSelect, onCha
           </div>
         )}
 
+        {/* Banner Color */}
         {(module.type === ModuleType.BANNER) && (
           <div>
             {renderLabelWithHelper('Banner Color', 'color')}
@@ -346,7 +424,8 @@ const ModuleItemEditor: React.FC<Props> = ({ module, isSelected, onSelect, onCha
           </div>
         )}
 
-        {(module.properties.content !== undefined) && (
+        {/* General Content */}
+        {(module.properties.content !== undefined && module.type !== ModuleType.TWO_COLUMN) && (
           <div>
             {renderLabelWithHelper("Content", "content")}
             <textarea 
@@ -362,6 +441,7 @@ const ModuleItemEditor: React.FC<Props> = ({ module, isSelected, onSelect, onCha
           </div>
         )}
 
+        {/* Button fields */}
         {module.type === ModuleType.BUTTON && (
           <>
             <div>
@@ -405,7 +485,8 @@ const ModuleItemEditor: React.FC<Props> = ({ module, isSelected, onSelect, onCha
           </>
         )}
 
-        {(module.properties.imageUrl !== undefined && module.type !== ModuleType.BUTTON) && (
+        {/* General Image fields */}
+        {(module.properties.imageUrl !== undefined && module.type !== ModuleType.BUTTON && module.type !== ModuleType.TWO_COLUMN) && (
           <div className="space-y-4">
             <div>
               {renderLabelWithHelper("Image URL / CID", "imageUrl")}
@@ -449,6 +530,7 @@ const ModuleItemEditor: React.FC<Props> = ({ module, isSelected, onSelect, onCha
           </div>
         )}
 
+        {/* Signature details */}
         {module.type === ModuleType.SIGNATURE && (
           <div className="flex items-center gap-2 py-1">
              <input type="checkbox" id={`rating-${module.id}`} checked={!!module.properties.hasStarRating} onChange={e => updateProp('hasStarRating', e.target.checked)} className="w-4 h-4 outline-none border-[#D7E5FC]" />
@@ -479,7 +561,6 @@ const ModuleItemEditor: React.FC<Props> = ({ module, isSelected, onSelect, onCha
               <label className="block text-[10px] font-bold text-slate-400 uppercase">Metrics</label>
               <button 
                 type="button"
-                // Fixed: replaced undefined 'fieldKey' with handleGlobalInsertExpression()
                 onMouseDown={(e) => { e.preventDefault(); handleGlobalInsertExpression(); }}
                 className="text-[9px] text-slate-400 hover:text-blue-500 font-bold transition-colors flex items-center gap-1 cursor-pointer outline-none"
               >
@@ -557,17 +638,6 @@ const ModuleItemEditor: React.FC<Props> = ({ module, isSelected, onSelect, onCha
                 + ADD METRIC
               </button>
             )}
-          </div>
-        )}
-
-        {/* TWO COLUMN Editor */}
-        {module.type === ModuleType.TWO_COLUMN && (
-          <div>
-            <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Image Position</label>
-            <div className="flex bg-slate-50 p-1 rounded-lg border border-[#D7E5FC] mb-3">
-              <button onClick={() => updateProp('imagePosition', 'left')} className={`flex-1 py-1 text-[10px] font-bold rounded outline-none ${module.properties.imagePosition === 'left' ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`}>LEFT</button>
-              <button onClick={() => updateProp('imagePosition', 'right')} className={`flex-1 py-1 text-[10px] font-bold rounded outline-none ${module.properties.imagePosition === 'right' ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`}>RIGHT</button>
-            </div>
           </div>
         )}
 

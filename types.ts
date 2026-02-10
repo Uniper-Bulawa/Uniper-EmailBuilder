@@ -60,6 +60,13 @@ export interface ModuleData {
     metrics?: KpiMetric[];
     imagePosition?: 'left' | 'right';
     checklistItems?: ChecklistItem[];
+    // Flexible Two Column properties
+    col1Type?: 'text' | 'image';
+    col1Text?: string;
+    col1ImageUrl?: string;
+    col2Type?: 'text' | 'image';
+    col2Text?: string;
+    col2ImageUrl?: string;
     // Legal properties
     chairman?: string;
     board?: string;

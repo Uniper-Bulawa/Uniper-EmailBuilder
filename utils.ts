@@ -193,19 +193,29 @@ export const renderModuleToHtml = (module: ModuleData, prevModuleType?: ModuleTy
             break;
 
         case ModuleType.TWO_COLUMN:
-            const isTwoColRight = properties.imagePosition === 'right';
-            const formattedTwoColContent = (properties.content || '').replace(/\n/g, '<br>');
+            const col1Type = properties.col1Type || (properties.imagePosition === 'right' ? 'text' : 'image');
+            const col2Type = properties.col2Type || (properties.imagePosition === 'right' ? 'image' : 'text');
+            
+            const renderColumn = (cType: string, cText?: string, cImg?: string) => {
+                if (cType === 'image') {
+                    const src = cImg || properties.imageUrl || 'https://picsum.photos/300/200';
+                    return `<td style="width: 50%; padding: 10px; vertical-align: middle;">
+    <img src="${src}" width="100%" style="display: block; width: 100%; height: auto; border-radius: 6px; border: 0;">
+</td>`;
+                } else {
+                    const text = cText || properties.content || 'Add text here...';
+                    const formatted = text.replace(/\n/g, '<br>');
+                    return `<td style="width: 50%; padding: 10px; vertical-align: middle;">
+    <div class="text-block" style="font-size: 15px; color: #333333; line-height: 1.5;">${formatted}</div>
+</td>`;
+                }
+            };
 
-            const twoColImgPart = `<td style="width: 45%; padding: 10px; vertical-align: middle;">
-    <img src="${properties.imageUrl}" width="100%" style="display: block; width: 100%; height: auto; border-radius: 6px;">
-</td>`;
-            const twoColTextPart = `<td style="width: 55%; padding: 10px; vertical-align: middle;">
-    <div class="text-block" style="font-size: 15px; color: #333333; line-height: 1.5;">${formattedTwoColContent}</div>
-</td>`;
             content = `<table cellspacing="0" cellpadding="0" border="0" style="width: 100%; max-width: 640px; margin: 25px auto;">
     <tbody>
         <tr>
-            ${isTwoColRight ? twoColTextPart + twoColImgPart : twoColImgPart + twoColTextPart}
+            ${renderColumn(col1Type, properties.col1Text, properties.col1ImageUrl)}
+            ${renderColumn(col2Type, properties.col2Text, properties.col2ImageUrl)}
         </tr>
     </tbody>
 </table>`;

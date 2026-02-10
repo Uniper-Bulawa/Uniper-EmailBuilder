@@ -4,7 +4,7 @@ import { DEFAULT_MODULES } from './constants';
 import { generateFullHtml } from './utils';
 import ModuleItemEditor from './components/ModuleItemEditor';
 
-const APP_VERSION = 'v0.7.1';
+const APP_VERSION = 'v0.7.2';
 
 const App: React.FC = () => {
   const [modules, setModules] = useState<ModuleData[]>(DEFAULT_MODULES);
@@ -147,9 +147,10 @@ const App: React.FC = () => {
         break;
       case ModuleType.TWO_COLUMN:
         baseModule.properties = { 
-          imageUrl: 'https://picsum.photos/300/200', 
-          content: 'Add your two-column text here. This layout works great for highlighting specific features or updates.',
-          imagePosition: 'left'
+          col1Type: 'image',
+          col1ImageUrl: 'https://picsum.photos/300/200',
+          col2Type: 'text',
+          col2Text: 'Add your two-column text here. This layout works great for highlighting specific features or updates.'
         };
         break;
       case ModuleType.CHECKLIST:

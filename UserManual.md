@@ -39,7 +39,7 @@ A real-time view of your email:
 - **Banner**: A high-impact title block with customizable background colors.
 - **Delivery Phase**: A visual tracker for project progress (Assess, Design, Develop, etc.).
 - **KPI Cards**: Perfect for reporting metrics with color-coded status indicators.
-- **Two Column**: A responsive layout pairing an image with text.
+- **Two Column**: A flexible responsive layout that allows you to choose either text or an image for each column independently.
 - **Checklist**: Multiple icon options (Blue squares, arrows, stars) for listing tasks or features.
 - **Legal**: Pre-filled with standard Uniper company information.
 
