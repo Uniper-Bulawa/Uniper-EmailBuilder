@@ -7,8 +7,7 @@ export const DEFAULT_MODULES: ModuleData[] = [
     section: 'inside',
     properties: {
       imageUrl: 'https://raw.githubusercontent.com/Uniper-Bulawa/dot-email-assets/main/report_logo_CO.png',
-      align: 'right',
-      altText: 'report_logo_CO.png'
+      align: 'right'
     }
   },
   {
@@ -43,11 +42,11 @@ export const DEFAULT_MODULES: ModuleData[] = [
     section: 'inside',
     properties: {
       checklistItems: [
-        { text: '<b>Ctrl + B</b>: Bold', icon: 'blue' },
-        { text: '<b>Ctrl + I</b>: Italic', icon: 'blue' },
-        { text: '<b>Ctrl + U</b>: Underline', icon: 'blue' },
-        { text: '<b>Ctrl + S</b>: Strike through', icon: 'blue' },
-        { text: '<b>Ctrl + K</b>: Insert Link tag', icon: 'blue' },
+        { text: '<b>Ctrl + B</b>: <b>Bold</b>', icon: 'blue' },
+        { text: '<b>Ctrl + I</b>: <i>Italic</i>', icon: 'blue' },
+        { text: '<b>Ctrl + U</b>: <u>Underline</u>', icon: 'blue' },
+        { text: '<b>Ctrl + S</b>: <s>Strike through</s>', icon: 'blue' },
+        { text: '<b>Ctrl + K</b>: <a href="https://uniper.sharepoint.com/sites/DOT/Lists/EmailBuilder%20Templates/" target="_blank" style="color:#0078DC;">Insert Link tag</a>', icon: 'blue' },
         { text: '<b>Ctrl + E</b>: Insert @{replace(\'!!!\',\'REFERENCE\')}', icon: 'blue' }
       ]
     }
@@ -70,7 +69,6 @@ export const DEFAULT_MODULES: ModuleData[] = [
     section: 'inside',
     properties: {
       imageUrl: 'cid:report.png',
-      altText: 'report.png',
       align: 'center'
     }
   },

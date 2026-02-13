@@ -1,16 +1,60 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { ModuleData, ModuleType, Template } from './types';
 import { DEFAULT_MODULES } from './constants';
 import { generateFullHtml } from './utils';
 import ModuleItemEditor from './components/ModuleItemEditor';
 
-const APP_VERSION = 'v0.8.1';
+/**
+ * WebApp - ChangeLog
+ * 
+ * Version 0.8.9 Summary:
+ * - Fixed preview scroll position preservation: Scroll state is now robustly synced using a ref, preventing jumps during real-time editing.
+ * - Implemented sidebar-to-preview synchronization: Selecting a module in the sidebar automatically scrolls the preview iframe to that module's location.
+ * - Optimized module selection behavior to only trigger scrolls on actual module changes, avoiding jitter during content entry.
+ */
+
+const APP_VERSION = 'v0.8.9';
 const STORAGE_KEY = 'dot_email_templates';
 
+const getInitialTemplates = (): Template[] => {
+  const saved = localStorage.getItem(STORAGE_KEY);
+  let loadedTemplates: Template[] = [];
+  
+  if (saved) {
+    try {
+      loadedTemplates = JSON.parse(saved);
+    } catch (e) {
+      console.error("Failed to parse templates", e);
+    }
+  }
+
+  // Ensure Demo template is always available
+  if (!loadedTemplates.some(t => t.name === 'Demo')) {
+    const demoTemplate: Template = {
+      id: 'tpl-demo',
+      name: 'Demo',
+      modules: DEFAULT_MODULES,
+      lastModified: Date.now()
+    };
+    loadedTemplates = [demoTemplate, ...loadedTemplates];
+  }
+  return loadedTemplates;
+};
+
 const App: React.FC = () => {
-  const [modules, setModules] = useState<ModuleData[]>(DEFAULT_MODULES);
-  const [templates, setTemplates] = useState<Template[]>([]);
-  const [currentTemplateId, setCurrentTemplateId] = useState<string | null>(null);
+  // Initialize state directly from storage to ensure persistence is robust
+  const [templates, setTemplates] = useState<Template[]>(getInitialTemplates);
+  const [modules, setModules] = useState<ModuleData[]>(() => {
+    const initial = getInitialTemplates();
+    const demo = initial.find(t => t.name === 'Demo');
+    return demo ? JSON.parse(JSON.stringify(demo.modules)) : DEFAULT_MODULES;
+  });
+  
+  const [currentTemplateId, setCurrentTemplateId] = useState<string | null>(() => {
+    const initial = getInitialTemplates();
+    return initial.find(t => t.name === 'Demo')?.id || null;
+  });
+
   const [isTemplatePanelOpen, setIsTemplatePanelOpen] = useState(false);
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
   const [saveModalName, setSaveModalName] = useState('');
@@ -19,48 +63,72 @@ const App: React.FC = () => {
   const [isPreviewDarkMode, setIsPreviewDarkMode] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
   const [selectedModuleId, setSelectedModuleId] = useState<string | null>(modules[0]?.id || null);
+  
+  // v0.8.6 - Global collapse state
+  const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
+
   const codeContainerRef = useRef<HTMLDivElement>(null);
+  const previewIframeRef = useRef<HTMLIFrameElement>(null);
+  const lastScrollY = useRef(0);
 
-  // Persistence: Load templates on mount
+  // Persistence: Save templates to localStorage whenever the list changes
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    let loadedTemplates: Template[] = [];
-    
-    if (saved) {
-      try {
-        loadedTemplates = JSON.parse(saved);
-      } catch (e) {
-        console.error("Failed to parse templates", e);
-      }
-    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(templates));
+  }, [templates]);
 
-    // Initialize Demo template if it doesn't exist
-    if (!loadedTemplates.some(t => t.name === 'Demo')) {
-      const demoTemplate: Template = {
-        id: 'tpl-demo',
-        name: 'Demo',
-        modules: DEFAULT_MODULES,
-        lastModified: Date.now()
-      };
-      loadedTemplates = [demoTemplate, ...loadedTemplates];
-    }
-
-    setTemplates(loadedTemplates);
-    
-    // Load Demo by default
-    const demo = loadedTemplates.find(t => t.name === 'Demo');
-    if (demo) {
-      setModules(demo.modules);
-      setCurrentTemplateId(demo.id);
-    }
+  // v0.8.6 - All modules collapsed on app start
+  useEffect(() => {
+    setCollapsedIds(new Set(modules.map(m => m.id)));
   }, []);
 
-  // Persistence: Save templates to localStorage when changed
+  // v0.8.9 - Robust scroll preservation and synchronized selection scrolling
   useEffect(() => {
-    if (templates.length > 0) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(templates));
+    const iframe = previewIframeRef.current;
+    if (!iframe) return;
+
+    const onScroll = () => {
+      if (iframe.contentWindow) {
+        lastScrollY.current = iframe.contentWindow.scrollY;
+      }
+    };
+
+    const onLoad = () => {
+      if (iframe.contentWindow) {
+        // Restore scroll position during editing reloads
+        iframe.contentWindow.scrollTo(0, lastScrollY.current);
+        iframe.contentWindow.addEventListener('scroll', onScroll);
+      }
+    };
+
+    iframe.addEventListener('load', onLoad);
+    // Initial attachment for existing iframe window
+    iframe.contentWindow?.addEventListener('scroll', onScroll);
+
+    return () => {
+      iframe.removeEventListener('load', onLoad);
+      iframe.contentWindow?.removeEventListener('scroll', onScroll);
+    };
+  }, [activeTab]);
+
+  // Sync selection from Sidebar to Preview
+  useEffect(() => {
+    if (activeTab === 'preview' && selectedModuleId && previewIframeRef.current) {
+      const iframe = previewIframeRef.current;
+      const scrollIntoView = () => {
+        const doc = iframe.contentDocument || iframe.contentWindow?.document;
+        if (doc) {
+          const el = doc.getElementById(`module-${selectedModuleId}`);
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }
+      };
+
+      // Delay slightly to ensure iframe has rendered the new selection state if any
+      const timeout = setTimeout(scrollIntoView, 50);
+      return () => clearTimeout(timeout);
     }
-  }, [templates]);
+  }, [selectedModuleId, activeTab]);
 
   const exportHtml = useMemo(() => generateFullHtml(modules, false), [modules]);
   const previewHtml = useMemo(() => generateFullHtml(modules, isPreviewDarkMode), [modules, isPreviewDarkMode]);
@@ -77,7 +145,30 @@ const App: React.FC = () => {
       }
       return filtered;
     });
+    setCollapsedIds(prev => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
   }, [selectedModuleId]);
+
+  const toggleModuleCollapse = useCallback((id: string) => {
+    setCollapsedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const toggleAllCollapse = () => {
+    const isAnyExpanded = modules.some(m => !collapsedIds.has(m.id));
+    if (isAnyExpanded) {
+      setCollapsedIds(new Set(modules.map(m => m.id)));
+    } else {
+      setCollapsedIds(new Set());
+    }
+  };
 
   const duplicateModule = useCallback((id: string) => {
     setModules(prev => {
@@ -93,6 +184,12 @@ const App: React.FC = () => {
       const newModules = [...prev];
       newModules.splice(index + 1, 0, newModule);
       setSelectedModuleId(newId);
+      // New duplicated module should be uncollapsed (expanded)
+      setCollapsedIds(prevColl => {
+        const next = new Set(prevColl);
+        next.delete(newId);
+        return next;
+      });
       return newModules;
     });
   }, []);
@@ -139,6 +236,11 @@ const App: React.FC = () => {
     if (!saveModalName.trim()) return;
 
     if (overwrite && currentTemplateId) {
+      const target = templates.find(t => t.id === currentTemplateId);
+      if (target?.name === 'Demo') {
+        alert("The Demo template is read-only and cannot be overwritten.");
+        return;
+      }
       setTemplates(prev => prev.map(t => t.id === currentTemplateId ? { 
         ...t, 
         name: saveModalName, 
@@ -165,11 +267,14 @@ const App: React.FC = () => {
       setCurrentTemplateId(tpl.id);
       setIsTemplatePanelOpen(false);
       setSelectedModuleId(tpl.modules[0]?.id || null);
+      // v0.8.6 - All modules collapsed on template load
+      setCollapsedIds(new Set(tpl.modules.map(m => m.id)));
     }
   };
 
   const deleteTemplate = (id: string) => {
-    if (templates.find(t => t.id === id)?.name === 'Demo') {
+    const tpl = templates.find(t => t.id === id);
+    if (tpl?.name === 'Demo') {
       alert("You cannot delete the Demo template.");
       return;
     }
@@ -185,16 +290,16 @@ const App: React.FC = () => {
     
     switch (type) {
       case ModuleType.HEADER_LOGO:
-        baseModule.properties = { imageUrl: 'https://raw.githubusercontent.com/Uniper-Bulawa/dot-email-assets/main/report_logo_CO.png', align: 'right', altText: 'report_logo_CO.png' };
+        baseModule.properties = { imageUrl: 'https://raw.githubusercontent.com/Uniper-Bulawa/dot-email-assets/main/report_logo_CO.png', align: 'right', url: '' };
         break;
       case ModuleType.BANNER:
-        baseModule.properties = { title: 'New Banner Title', color: '#0078DC' };
+        baseModule.properties = { title: 'New Banner Title', color: '#0078DC', isDivider: false };
         break;
       case ModuleType.TEXT:
         baseModule.properties = { content: "Dear @{replace('!!!','Recipient')},\n\nAdd your text here...", align: 'left' };
         break;
       case ModuleType.IMAGE:
-        baseModule.properties = { imageUrl: 'https://picsum.photos/640/300', altText: '300', align: 'center' };
+        baseModule.properties = { imageUrl: 'https://picsum.photos/640/300', align: 'center', url: '' };
         break;
       case ModuleType.TABLE:
         baseModule.properties = { 
@@ -207,10 +312,17 @@ const App: React.FC = () => {
         };
         break;
       case ModuleType.BUTTON:
-        baseModule.properties = { content: 'Call to action text', buttonText: 'Click Me', url: '#', color: '#0078DC' };
+        baseModule.properties = { 
+          content: 'Call to action text', 
+          buttonText: 'Click Me', 
+          url: '#', 
+          color: '#0078DC',
+          hasContentBox: true,
+          secondaryButtons: []
+        };
         break;
       case ModuleType.SIGNATURE:
-        baseModule.properties = { content: '<b>Automatic Email Disclaimer</b>', imageUrl: 'https://raw.githubusercontent.com/Uniper-Bulawa/dot-email-assets/main/report_logo_DOT.png', hasStarRating: true };
+        baseModule.properties = { content: '<b>Automatic Email Disclaimer</b>', imageUrl: 'https://raw.githubusercontent.com/Uniper-Bulawa/dot-email-assets/main/report_logo_DOT.png', hasStarRating: true, url: '' };
         baseModule.section = 'outside';
         break;
       case ModuleType.DELIVERY_PHASE:
@@ -262,6 +374,12 @@ const App: React.FC = () => {
       return newModules;
     });
     setSelectedModuleId(id);
+    // v0.8.6 - New added module should be uncollapsed (expanded)
+    setCollapsedIds(prev => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
   };
 
   const copyToClipboard = () => {
@@ -325,6 +443,9 @@ const App: React.FC = () => {
   const insideModules = modules.filter(m => m.section === 'inside');
   const outsideModules = modules.filter(m => m.section === 'outside');
   const activeTemplate = templates.find(t => t.id === currentTemplateId);
+  
+  // v0.8.6 - Global collapse check
+  const isAnyExpanded = modules.some(m => !collapsedIds.has(m.id));
 
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden text-slate-900">
@@ -354,8 +475,9 @@ const App: React.FC = () => {
               <div className="grid grid-cols-2 gap-2">
                  <button 
                   onClick={() => handleSaveConfirm(true)}
-                  disabled={!saveModalName.trim() || !currentTemplateId}
+                  disabled={!saveModalName.trim() || !currentTemplateId || activeTemplate?.name === 'Demo'}
                   className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-2.5 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm"
+                  title={activeTemplate?.name === 'Demo' ? 'Demo template cannot be overwritten' : ''}
                 >
                   UPDATE EXISTING
                 </button>
@@ -455,12 +577,15 @@ const App: React.FC = () => {
               <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">Template:</span>
               <span className="text-[10px] font-bold text-blue-700 truncate">{activeTemplate?.name || 'Unsaved Layout'}</span>
            </div>
+           {/* v0.8.6 - Replaced SAVE with Collapse/Expand All Toggle */}
            <button 
-             onClick={openSaveModal}
-             className="text-[9px] font-bold text-slate-500 hover:text-blue-600 flex items-center gap-1 transition-colors"
+             onClick={toggleAllCollapse}
+             className="text-[9px] font-bold text-slate-500 hover:text-blue-600 flex items-center gap-1.5 transition-colors uppercase"
            >
-             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
-             SAVE
+             <svg className={`w-3 h-3 transition-transform ${isAnyExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 13l-7 7-7-7M19 5l-7 7-7-7" />
+             </svg>
+             {isAnyExpanded ? 'COLLAPSE ALL' : 'EXPAND ALL'}
            </button>
         </div>
 
@@ -475,6 +600,8 @@ const App: React.FC = () => {
                 key={module.id} 
                 module={module} 
                 isSelected={selectedModuleId === module.id}
+                isCollapsed={collapsedIds.has(module.id)}
+                onToggleCollapse={toggleModuleCollapse}
                 onSelect={setSelectedModuleId}
                 onChange={updateModule}
                 onRemove={removeModule}
@@ -497,6 +624,8 @@ const App: React.FC = () => {
                 key={module.id} 
                 module={module} 
                 isSelected={selectedModuleId === module.id}
+                isCollapsed={collapsedIds.has(module.id)}
+                onToggleCollapse={toggleModuleCollapse}
                 onSelect={setSelectedModuleId}
                 onChange={updateModule}
                 onRemove={removeModule}
@@ -554,7 +683,12 @@ const App: React.FC = () => {
         >
           {activeTab === 'preview' ? (
             <div className="w-full max-w-[1000px] bg-white rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.08)] overflow-hidden border border-slate-200">
-              <iframe srcDoc={previewHtml} className="w-full h-[calc(100vh-160px)] border-none" title="Email Preview" />
+              <iframe 
+                ref={previewIframeRef}
+                srcDoc={previewHtml} 
+                className="w-full h-[calc(100vh-160px)] border-none" 
+                title="Email Preview" 
+              />
             </div>
           ) : (
             <div className="w-full max-w-[1000px] h-full" ref={codeContainerRef}>

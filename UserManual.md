@@ -60,7 +60,7 @@ The editor supports powerful keyboard shortcuts for rich text formatting directl
 | **Ctrl + K** | Insert Link | `<a href="URL" style="...">text</a>` |
 | **Ctrl + E** | **Insert Expression** | `@{replace('!!!','REFERENCE')}` |
 
-> **Pro Tip**: Use the **Insert Expr.** button next to labels to quickly add Power Automate dynamic expressions without typing.
+> **Pro Tip**: Use the **Insert Expr.** button next to labels (or Ctrl + E) to quickly add Power Automate dynamic expressions without typing. This way you can easily identify or search for "replace" when importing the code to Power Automate. *Note: In case you miss one, the flow will fail since the placeholder expression code is invalid.*
 
 ---
 

@@ -33,6 +33,12 @@ export interface ChecklistItem {
   icon: 'empty' | 'checked' | 'blue' | 'black' | 'circle' | 'disc' | 'arrow' | 'star';
 }
 
+export interface SecondaryButton {
+  text: string;
+  url: string;
+  color?: string;
+}
+
 export interface ModuleData {
   id: string;
   type: ModuleType;
@@ -67,6 +73,10 @@ export interface ModuleData {
     col2ImageUrl?: string;
     chairman?: string;
     board?: string;
+    // New properties for v0.8.5
+    isDivider?: boolean;
+    hasContentBox?: boolean;
+    secondaryButtons?: SecondaryButton[];
   };
 }
 

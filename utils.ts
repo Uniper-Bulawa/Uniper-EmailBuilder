@@ -36,8 +36,10 @@ export const renderModuleToHtml = (module: ModuleData, prevModuleType?: ModuleTy
 
     switch (type) {
         case ModuleType.HEADER_LOGO:
+            const logoImgHtml = `<img src="${properties.imageUrl}" width="auto" alt="${getFileName(properties.imageUrl)}" style="display: inline-block; width: auto; max-width: 640px; height: auto;">`;
+            const logoContent = properties.url ? `<a href="${properties.url}" style="text-decoration: none;">${logoImgHtml}</a>` : logoImgHtml;
             content = `<div class="header-logo" style="text-align: ${properties.align || 'right'}; margin-bottom: 20px; margin-top: 20px;">
-    <img src="${properties.imageUrl}" width="auto" alt="${properties.altText || getFileName(properties.imageUrl)}" style="display: inline-block; width: auto; max-width: 640px; height: auto;">
+    ${logoContent}
 </div>`;
             break;
 
@@ -46,14 +48,16 @@ export const renderModuleToHtml = (module: ModuleData, prevModuleType?: ModuleTy
             const bannerRadius = isFollowedByDP ? '12px 12px 0 0' : '12px';
             const vmlTag = isFollowedByDP ? 'v:rect' : 'v:roundrect';
             const arcSize = isFollowedByDP ? '' : 'arcsize="24%"';
+            const bannerHeight = properties.isDivider ? '8px' : '50px';
+            const vmlHeight = properties.isDivider ? '8' : '50';
 
             content = `<!--[if mso]>
-<${vmlTag} xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" style="height:50px;v-text-anchor:middle;width:640px;" ${arcSize} stroke="f" fillcolor="${properties.color}">
+<${vmlTag} xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" style="height:${vmlHeight}px;v-text-anchor:middle;width:640px;" ${arcSize} stroke="f" fillcolor="${properties.color}">
     <w:anchorlock/>
     <center>
 <![endif]-->
-<div class="banner-bg" style="margin-top: 25px; text-align: center; padding: 12px; background-color: ${properties.color}; border-radius: ${bannerRadius};">
-    <h2 class="banner-text" style="color: #ffffff; margin: 0; font-size: 20px; font-weight: 600;">${properties.title}</h2>
+<div class="banner-bg" style="margin-top: 25px; text-align: center; ${properties.isDivider ? `height: ${bannerHeight}; padding: 0;` : 'padding: 12px;'} background-color: ${properties.color}; border-radius: ${bannerRadius};">
+    ${properties.isDivider ? '' : `<h2 class="banner-text" style="color: #ffffff; margin: 0; font-size: 20px; font-weight: 600;">${properties.title}</h2>`}
 </div>
 <!--[if mso]>
     </center>
@@ -72,11 +76,13 @@ export const renderModuleToHtml = (module: ModuleData, prevModuleType?: ModuleTy
             const h = formatDimension(properties.imageHeight);
             const imgAlign = properties.align || 'center';
             const margin = imgAlign === 'center' ? '0 auto' : (imgAlign === 'right' ? '0 0 0 auto' : '0');
+            const mainImgHtml = `<img src="${properties.imageUrl}" alt="${getFileName(properties.imageUrl)}" style="display: block; width: ${w}; max-width: 100%; height: ${h}; margin: ${margin}; border-radius: 8px; border: 0; -ms-interpolation-mode: bicubic;">`;
+            const mainImgContent = properties.url ? `<a href="${properties.url}" style="text-decoration: none;">${mainImgHtml}</a>` : mainImgHtml;
             content = `<table cellspacing="0" cellpadding="0" border="0" style="width: 100%; max-width: 640px; margin: 25px auto;">
     <tbody>
         <tr>
             <td align="${imgAlign}" style="padding: 0; text-align: ${imgAlign};">
-                <img src="${properties.imageUrl}" alt="${properties.altText || getFileName(properties.imageUrl)}" style="display: block; width: ${w}; max-width: 100%; height: ${h}; margin: ${margin}; border-radius: 8px; border: 0; -ms-interpolation-mode: bicubic;">
+                ${mainImgContent}
             </td>
         </tr>
     </tbody>
@@ -117,11 +123,25 @@ export const renderModuleToHtml = (module: ModuleData, prevModuleType?: ModuleTy
             break;
 
         case ModuleType.BUTTON:
+            const showBox = properties.hasContentBox !== false;
             const formattedButtonContent = (properties.content || '').replace(/\n/g, '<br>');
-            content = `<div class="button-section" style="margin-top: 25px; text-align: center; padding: 20px; background-color: #f9f9f9; border-radius: 8px;">
+            const mainBtn = `<a href="${properties.url}" class="button-link" style="background-color: ${properties.color || '#0078DC'}; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block; font-size: 14px; margin: 5px;">${properties.buttonText}</a>`;
+            const secBtns = (properties.secondaryButtons || []).map(btn => 
+                `<a href="${btn.url}" class="button-link" style="background-color: ${btn.color || '#0078DC'}; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block; font-size: 14px; margin: 5px;">${btn.text}</a>`
+            ).join('');
+
+            const buttonsContainer = `<div style="text-align: center; font-size: 0;">${mainBtn}${secBtns}</div>`;
+
+            if (showBox) {
+                content = `<div class="button-section" style="margin-top: 25px; text-align: center; padding: 20px; background-color: #f9f9f9; border-radius: 8px;">
     <p class="button-hint" style="margin: 0 0 15px 0; font-size: 13px; color: #666; line-height: 1.5;">${formattedButtonContent}</p>
-    <a href="${properties.url}" class="button-link" style="background-color: ${properties.color || '#0078DC'}; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block; font-size: 14px; transition: all 0.3s ease;">${properties.buttonText}</a>
+    ${buttonsContainer}
 </div>`;
+            } else {
+                content = `<div class="button-section-no-box" style="margin-top: 25px; text-align: center;">
+    ${buttonsContainer}
+</div>`;
+            }
             break;
 
         case ModuleType.SIGNATURE:
@@ -139,11 +159,13 @@ export const renderModuleToHtml = (module: ModuleData, prevModuleType?: ModuleTy
 </div>` : '';
 
             const formattedSigContent = (properties.content || '').replace(/\n/g, '<br>');
+            const sigImgHtml = `<img src="${properties.imageUrl}" alt="${getFileName(properties.imageUrl)}" style="display: inline-block; width: auto; max-width: 640px; height: 40px;">`;
+            const sigLogoContent = properties.url ? `<a href="${properties.url}" style="text-decoration: none;">${sigImgHtml}</a>` : sigImgHtml;
             content = `<p class="signature-text" style="font-size: 11px; color: #C6C6C6; text-align: center; margin-top: 20px; line-height: 1.5;">
     ${formattedSigContent}
 </p>
 <div class="signature-logo" style="text-align: center; margin-top: 40px; ${!properties.hasStarRating ? 'margin-bottom: 40px;' : ''}">
-    <img src="${properties.imageUrl}" alt="Footer Logo" style="display: inline-block; width: auto; max-width: 640px; height: 40px;">
+    ${sigLogoContent}
 </div>${ratingHtml}`;
             break;
 
@@ -200,7 +222,7 @@ export const renderModuleToHtml = (module: ModuleData, prevModuleType?: ModuleTy
                 if (cType === 'image') {
                     const src = cImg || properties.imageUrl || 'https://picsum.photos/300/200';
                     return `<td style="width: 50%; padding: 10px; vertical-align: middle;">
-    <img src="${src}" width="100%" style="display: block; width: 100%; height: auto; border-radius: 6px; border: 0;">
+    <img src="${src}" width="100%" alt="${getFileName(src)}" style="display: block; width: 100%; height: auto; border-radius: 6px; border: 0;">
 </td>`;
                 } else {
                     const text = cText || properties.content || 'Add text here...';
@@ -252,7 +274,7 @@ export const renderModuleToHtml = (module: ModuleData, prevModuleType?: ModuleTy
             content = '';
     }
 
-    return `<!-- START_ID:${id} -->\n\n${content.trim()}\n\n<!-- END_ID:${id} -->`;
+    return `<!-- START_ID:${id} --><div id="module-${id}">\n\n${content.trim()}\n\n</div><!-- END_ID:${id} -->`;
 };
 
 export const generateFullHtml = (modules: ModuleData[], isDarkMode: boolean = false): string => {
@@ -328,7 +350,7 @@ export const generateFullHtml = (modules: ModuleData[], isDarkMode: boolean = fa
 <head>
     <meta charset="UTF-8">
     <style>
-        body { margin: 0; padding: 0; transition: background-color 0.3s ease; }
+        body { margin: 0; padding: 0; transition: background-color 0.3s ease; scroll-behavior: smooth; }
         .cta-button:hover { background-color: #135B8B !important; }
         ${darkSimulationStyles}
     </style>
