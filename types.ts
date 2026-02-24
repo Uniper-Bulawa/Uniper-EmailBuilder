@@ -1,92 +1,13 @@
-export enum ModuleType {
-  HEADER_LOGO = 'HEADER_LOGO',
-  BANNER = 'BANNER',
-  TEXT = 'TEXT',
-  IMAGE = 'IMAGE',
-  TABLE = 'TABLE',
-  BUTTON = 'BUTTON',
-  SIGNATURE = 'SIGNATURE',
-  DELIVERY_PHASE = 'DELIVERY_PHASE',
-  KPI_CARDS = 'KPI_CARDS',
-  TWO_COLUMN = 'TWO_COLUMN',
-  CHECKLIST = 'CHECKLIST',
-  LEGAL = 'LEGAL'
-}
+<div align="center">
+<img width="auto" height="475" alt="DOT_Logo" src="https://github.com/Uniper-Bulawa/dot-email-assets/blob/main/DOT_small_bm.png" />
+</div>
+<br>
+The DOT - Email Builder is a specialized tool for creating modular, responsive, and brand-compliant HTML email templates. It is specifically optimized for Power Automate, allowing you to insert dynamic expressions directly into the email structure.
 
-export interface TableRow {
-  label: string;
-  value: string;
-}
-
-export interface GridRow {
-  cells: string[];
-}
-
-export interface KpiMetric {
-  value: string;
-  label: string;
-  color: string;
-}
-
-export interface ChecklistItem {
-  text: string;
-  icon: 'empty' | 'checked' | 'blue' | 'black' | 'circle' | 'disc' | 'arrow' | 'star';
-}
-
-export interface SecondaryButton {
-  text: string;
-  url: string;
-  color?: string;
-}
-
-export interface ModuleData {
-  id: string;
-  type: ModuleType;
-  section: 'inside' | 'outside';
-  properties: {
-    imageUrl?: string;
-    imageWidth?: string;
-    imageHeight?: string;
-    title?: string;
-    content?: string;
-    url?: string;
-    buttonText?: string;
-    rows?: TableRow[];
-    headers?: string[];
-    gridRows?: GridRow[];
-    hasColumnHeaders?: boolean;
-    hasRowHeaders?: boolean;
-    hasStarRating?: boolean;
-    align?: 'left' | 'center' | 'right';
-    color?: string;
-    secondaryColor?: string;
-    altText?: string;
-    selectedPhase?: string;
-    metrics?: KpiMetric[];
-    imagePosition?: 'left' | 'right';
-    checklistItems?: ChecklistItem[];
-    col1Type?: 'text' | 'image';
-    col1Text?: string;
-    col1ImageUrl?: string;
-    col2Type?: 'text' | 'image';
-    col2Text?: string;
-    col2ImageUrl?: string;
-    chairman?: string;
-    board?: string;
-    // New properties for v0.8.5
-    isDivider?: boolean;
-    hasContentBox?: boolean;
-    secondaryButtons?: SecondaryButton[];
-  };
-}
-
-export interface Template {
-  id: string;
-  name: string;
-  modules: ModuleData[];
-  lastModified: number;
-}
-
-export interface EmailState {
-  modules: ModuleData[];
-}
+## Interface Overview
+The application is divided into two primary sections:
+- Left Sidebar (the Editor): Where you add, remove, reorder, and configure your email modules.
+- Main Area (the Preview): A live-updating view of your email. You can toggle between Preview (visual) and Export HTML (raw code).
+<br>
+<div align="center">
+<img width="auto" height="475" alt="DOT_Logo" src="https://github.com/Uniper-Bulawa/dot-email-assets/blob/main/report_logo_DOT.png" />

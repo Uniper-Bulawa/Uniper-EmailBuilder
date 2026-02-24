@@ -1,55 +1,867 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Email Module Builder</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        body { font-family: 'Inter', sans-serif; }
-        
-        /* Ensure all inputs have white background */
-        input, textarea, select {
-            background-color: white !important;
-        }
 
-        /* Global custom scrollbar */
-        ::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
-        }
-        ::-webkit-scrollbar-track {
-            background: transparent;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #cbd5e1;
-            border-radius: 10px;
-            border: 2px solid transparent;
-            background-clip: content-box;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #94a3b8;
-            border: 2px solid transparent;
-            background-clip: content-box;
-        }
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { ModuleData, ModuleType, Template } from './types';
+import { DEFAULT_MODULES } from './constants';
+import { generateFullHtml } from './utils';
+import ModuleItemEditor from './components/ModuleItemEditor';
+import { fetchTemplatesFromFlow, saveTemplateToFlow } from './services/sharepoint';
 
-        .custom-scrollbar {
-            scrollbar-width: thin;
-            scrollbar-color: #cbd5e1 transparent;
-        }
-    </style>
-<script type="importmap">
-{
-  "imports": {
-    "react": "https://esm.sh/react@^19.2.4",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
-    "react/": "https://esm.sh/react@^19.2.4/"
+/**
+ * WebApp - ChangeLog
+ * 
+ * Version 0.9.8 Summary:
+ * - Restored code highlighting in HTML view when selecting a module.
+ * - Added line numbers to the HTML code viewer.
+ * - Implemented auto-scroll to selection for the code tab.
+ * 
+ * Version 0.9.7 Summary:
+ * - 'SP Templates' header in panel is now a link to the SharePoint list.
+ * - Removed redundant 'Save' button from the top navigation bar.
+ * - Removed individual template delete buttons from the list.
+ *
+ * Version 0.9.9 Summary:
+ * - Resized the 'Add Module' pop-up to remove the scrollbar from the list of buttons.
+ *
+ * Version 0.9.10 Summary:
+ * - Adjusted the demo template to set the bottom banner module to divider mode.
+ *
+ * Version 0.9.11 Summary:
+ * - Implemented combined hover-and-click behavior for 'Templates' and 'Add' dropdowns.
+ *
+ * Version 0.9.12 Summary:
+ * - Aligned hover behavior of 'Templates' dropdown with 'Add' button for a more forgiving hover area.
+ *
+ * Version 0.9.13 Summary:
+ * - Added word wrap to HTML code view to eliminate horizontal scrolling.
+ * - Fixed SecurityError for iframe interaction by adding sandbox attributes.
+ *
+ * Version 0.9.14 Summary:
+ * - Deferred loading of templates list until 'Refresh' button is clicked.
+ * - Added help text to explain template loading behavior.
+ *
+ * Version 0.9.15 Summary:
+ * - Moved template loading help text above the 'Demo' entry.
+ * - Conditionally hid help text after a refresh has been executed.
+ */
+
+const APP_VERSION = 'v0.9.15';
+const STORAGE_KEY = 'dot_email_templates';
+
+const getInitialTemplates = (): Template[] => {
+  const saved = localStorage.getItem(STORAGE_KEY);
+  let loadedTemplates: Template[] = [];
+  
+  if (saved) {
+    try {
+      loadedTemplates = JSON.parse(saved);
+    } catch (e) {
+      console.error("Failed to parse templates", e);
+    }
   }
-}
-</script>
-</head>
-<body class="bg-slate-50 text-slate-900 overflow-hidden">
-    <div id="root"></div>
-</body>
-</html>
+
+  // Ensure Demo template is always available
+  if (!loadedTemplates.some(t => t.name === 'Demo')) {
+    const demoTemplate: Template = {
+      id: 'tpl-demo',
+      name: 'Demo',
+      modules: DEFAULT_MODULES,
+      lastModified: Date.now()
+    };
+    loadedTemplates = [demoTemplate, ...loadedTemplates];
+  }
+  return loadedTemplates;
+};
+
+const App: React.FC = () => {
+  const [templates, setTemplates] = useState<Template[]>(getInitialTemplates);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
+  
+  const [modules, setModules] = useState<ModuleData[]>(() => {
+    const initial = getInitialTemplates();
+    const demo = initial.find(t => t.name === 'Demo');
+    return demo ? JSON.parse(JSON.stringify(demo.modules)) : DEFAULT_MODULES;
+  });
+  
+  const [currentTemplateId, setCurrentTemplateId] = useState<string | null>(() => {
+    const initial = getInitialTemplates();
+    return initial.find(t => t.name === 'Demo')?.id || null;
+  });
+
+  const [isTemplatePanelOpen, setIsTemplatePanelOpen] = useState(false);
+  const [isTemplatePanelPinned, setIsTemplatePanelPinned] = useState(false);
+  const [isAddPanelOpen, setIsAddPanelOpen] = useState(false);
+  const [isAddPanelPinned, setIsAddPanelPinned] = useState(false);
+  const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
+  const [saveModalName, setSaveModalName] = useState('');
+  
+  const [activeTab, setActiveTab] = useState<'preview' | 'code'>('preview');
+  const [isPreviewDarkMode, setIsPreviewDarkMode] = useState(false);
+  const [copySuccess, setCopySuccess] = useState(false);
+  const [selectedModuleId, setSelectedModuleId] = useState<string | null>(modules[0]?.id || null);
+  
+  const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
+  const [hasRefreshed, setHasRefreshed] = useState(false);
+
+  const codeContainerRef = useRef<HTMLDivElement>(null);
+  const previewIframeRef = useRef<HTMLIFrameElement>(null);
+  const templatePanelRef = useRef<HTMLDivElement>(null);
+  const addPanelRef = useRef<HTMLDivElement>(null);
+  const lastScrollY = useRef(0);
+
+  // Synchronization: Fetch templates from Power Automate
+  const syncWithServer = useCallback(async () => {
+    setIsSyncing(true);
+    setSyncError(null);
+    try {
+      const serverTemplates = await fetchTemplatesFromFlow();
+      
+      setTemplates(prev => {
+        const demo = prev.find(t => t.name === 'Demo')!;
+        const combined = [demo, ...serverTemplates];
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(combined));
+        return combined;
+      });
+    } catch (err: any) {
+      let msg = err.message;
+      if (msg.includes('DirectApiInvalidAuthorizationScheme')) {
+        msg = "SAS Policy Error: SAS auth is disabled in Flow access control policy.";
+      } else if (msg === 'Failed to fetch') {
+        msg = "Network/CORS Error. Check F12 console.";
+      }
+      setSyncError(msg);
+      console.warn('⚠️ Sync failed:', err);
+    } finally {
+      setIsSyncing(false);
+      setHasRefreshed(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    setCollapsedIds(new Set(modules.map(m => m.id)));
+  }, []);
+
+  // Handle clicks outside to close dropdowns
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (templatePanelRef.current && !templatePanelRef.current.contains(event.target as Node)) {
+        setIsTemplatePanelOpen(false);
+        setIsTemplatePanelPinned(false);
+      }
+      if (addPanelRef.current && !addPanelRef.current.contains(event.target as Node)) {
+        setIsAddPanelOpen(false);
+        setIsAddPanelPinned(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  // Robust scroll preservation logic for Preview
+  useEffect(() => {
+    const iframe = previewIframeRef.current;
+    if (!iframe) return;
+
+    const onScroll = () => {
+      if (iframe.contentWindow) {
+        lastScrollY.current = iframe.contentWindow.scrollY;
+      }
+    };
+
+    const onLoad = () => {
+      if (iframe.contentWindow) {
+        iframe.contentWindow.scrollTo(0, lastScrollY.current);
+        iframe.contentWindow.addEventListener('scroll', onScroll);
+      }
+    };
+
+    iframe.addEventListener('load', onLoad);
+    iframe.contentWindow?.addEventListener('scroll', onScroll);
+
+    return () => {
+      iframe.removeEventListener('load', onLoad);
+      iframe.contentWindow?.removeEventListener('scroll', onScroll);
+    };
+  }, [activeTab]);
+
+  // Sync selection from Sidebar to Preview or Code
+  useEffect(() => {
+    if (!selectedModuleId) return;
+
+    if (activeTab === 'preview' && previewIframeRef.current) {
+      const iframe = previewIframeRef.current;
+      const scrollIntoView = () => {
+        const doc = iframe.contentDocument || iframe.contentWindow?.document;
+        if (doc) {
+          const el = doc.getElementById(`module-${selectedModuleId}`);
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }
+      };
+      const timeout = setTimeout(scrollIntoView, 50);
+      return () => clearTimeout(timeout);
+    } 
+    
+    if (activeTab === 'code') {
+      const scrollIntoView = () => {
+        const el = document.getElementById(`code-block-${selectedModuleId}`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      };
+      const timeout = setTimeout(scrollIntoView, 50);
+      return () => clearTimeout(timeout);
+    }
+  }, [selectedModuleId, activeTab]);
+
+  const exportHtml = useMemo(() => generateFullHtml(modules, false), [modules]);
+  const previewHtml = useMemo(() => generateFullHtml(modules, isPreviewDarkMode), [modules, isPreviewDarkMode]);
+
+  const updateModule = useCallback((id: string, properties: any) => {
+    setModules(prev => prev.map(m => m.id === id ? { ...m, properties } : m));
+  }, []);
+
+  const removeModule = useCallback((id: string) => {
+    setModules(prev => {
+      const filtered = prev.filter(m => m.id !== id);
+      if (selectedModuleId === id) {
+        setSelectedModuleId(filtered[0]?.id || null);
+      }
+      return filtered;
+    });
+    setCollapsedIds(prev => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+  }, [selectedModuleId]);
+
+  const toggleModuleCollapse = useCallback((id: string) => {
+    setCollapsedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const toggleAllCollapse = () => {
+    const isAnyExpanded = modules.some(m => !collapsedIds.has(m.id));
+    if (isAnyExpanded) {
+      setCollapsedIds(new Set(modules.map(m => m.id)));
+    } else {
+      setCollapsedIds(new Set());
+    }
+  };
+
+  const duplicateModule = useCallback((id: string) => {
+    setModules(prev => {
+      const index = prev.findIndex(m => m.id === id);
+      if (index === -1) return prev;
+      const sourceModule = prev[index];
+      const newId = `m-dup-${Date.now()}`;
+      const newModule: ModuleData = {
+        ...sourceModule,
+        id: newId,
+        properties: JSON.parse(JSON.stringify(sourceModule.properties))
+      };
+      const newModules = [...prev];
+      newModules.splice(index + 1, 0, newModule);
+      setSelectedModuleId(newId);
+      setCollapsedIds(prevColl => {
+        const next = new Set(prevColl);
+        next.delete(newId);
+        return next;
+      });
+      return newModules;
+    });
+  }, []);
+
+  const moveModule = useCallback((id: string, direction: 'up' | 'down') => {
+    setModules(prev => {
+      const index = prev.findIndex(m => m.id === id);
+      if (index === -1) return prev;
+      const currentModule = prev[index];
+      const newModules = [...prev];
+      if (direction === 'up') {
+        if (index === 0) return prev;
+        const prevModule = prev[index - 1];
+        if (currentModule.section === 'outside' && prevModule.section === 'inside') {
+          newModules[index] = { ...currentModule, section: 'inside' };
+          return newModules;
+        }
+        [newModules[index], newModules[index - 1]] = [newModules[index - 1], newModules[index]];
+      } else {
+        if (index === prev.length - 1) return prev;
+        const nextModule = prev[index + 1];
+        if (currentModule.section === 'inside' && nextModule.section === 'outside') {
+          newModules[index] = { ...currentModule, section: 'outside' };
+          return newModules;
+        }
+        const lastInsideIndex = prev.reduce((last, m, i) => m.section === 'inside' ? i : last, -1);
+        if (direction === 'down' && index === lastInsideIndex && index === prev.length - 1) {
+           newModules[index] = { ...currentModule, section: 'outside' };
+           return newModules;
+        }
+        [newModules[index], newModules[index + 1]] = [newModules[index + 1], newModules[index]];
+      }
+      return newModules;
+    });
+  }, []);
+
+  const openSaveModal = () => {
+    const active = templates.find(t => t.id === currentTemplateId);
+    setSaveModalName(active?.name || '');
+    setIsSaveModalOpen(true);
+  };
+
+  const handleSaveConfirm = async (overwrite: boolean) => {
+    if (!saveModalName.trim()) return;
+    setIsSyncing(true);
+
+    let tplToSave: Template;
+    const active = templates.find(t => t.id === currentTemplateId);
+
+    if (overwrite && active) {
+      if (active.name === 'Demo') {
+        alert("The Demo template is read-only.");
+        setIsSyncing(false);
+        return;
+      }
+      tplToSave = { 
+        ...active, 
+        name: saveModalName, 
+        modules: JSON.parse(JSON.stringify(modules)), 
+        lastModified: Date.now() 
+      };
+    } else {
+      tplToSave = {
+        id: `tpl-${Date.now()}`,
+        name: saveModalName,
+        modules: JSON.parse(JSON.stringify(modules)),
+        lastModified: Date.now()
+      };
+    }
+
+    try {
+      const success = await saveTemplateToFlow(tplToSave);
+      if (success) {
+        await syncWithServer();
+        setIsSaveModalOpen(false);
+      }
+    } catch (err: any) {
+      let errorMsg = "Save Failed.";
+      if (err.message.includes('DirectApiInvalidAuthorizationScheme')) {
+        errorMsg += "\n\nError: SAS auth is disabled in Flow policy. Go to Flow Settings -> Access Control Configuration.";
+      } else {
+        errorMsg += "\n\n" + err.message;
+      }
+      alert(errorMsg);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const loadTemplate = (id: string) => {
+    const tpl = templates.find(t => t.id === id);
+    if (tpl) {
+      setModules(JSON.parse(JSON.stringify(tpl.modules)));
+      setCurrentTemplateId(tpl.id);
+      setIsTemplatePanelOpen(false);
+      setSelectedModuleId(tpl.modules[0]?.id || null);
+      setCollapsedIds(new Set(tpl.modules.map(m => m.id)));
+    }
+  };
+
+  const addModule = (type: ModuleType) => {
+    const id = `m-${Date.now()}`;
+    const baseModule: Partial<ModuleData> = { id, type, section: 'inside' };
+    
+    switch (type) {
+      case ModuleType.HEADER_LOGO:
+        baseModule.properties = { imageUrl: 'https://raw.githubusercontent.com/Uniper-Bulawa/dot-email-assets/main/report_logo_CO.png', align: 'right', url: '' };
+        break;
+      case ModuleType.BANNER:
+        baseModule.properties = { title: 'New Banner Title', color: '#0078DC', isDivider: false };
+        break;
+      case ModuleType.TEXT:
+        baseModule.properties = { content: "Dear @{replace('!!!','Recipient')},\n\nAdd your text here...", align: 'left' };
+        break;
+      case ModuleType.IMAGE:
+        baseModule.properties = { imageUrl: 'https://picsum.photos/640/300', align: 'center', url: '' };
+        break;
+      case ModuleType.TABLE:
+        baseModule.properties = { 
+          hasColumnHeaders: true,
+          hasRowHeaders: false,
+          gridRows: [
+            { cells: ['Header 1', 'Header 2'] },
+            { cells: ['Data 1', 'Data 2'] }
+          ]
+        };
+        break;
+      case ModuleType.BUTTON:
+        baseModule.properties = { 
+          content: 'Call to action text', 
+          buttonText: 'Click Me', 
+          url: '#', 
+          color: '#0078DC',
+          hasContentBox: true,
+          secondaryButtons: []
+        };
+        break;
+      case ModuleType.SIGNATURE:
+        baseModule.properties = { content: '<b>Automatic Email Disclaimer</b>', imageUrl: 'https://raw.githubusercontent.com/Uniper-Bulawa/dot-email-assets/main/report_logo_DOT.png', hasStarRating: true, url: '' };
+        baseModule.section = 'outside';
+        break;
+      case ModuleType.DELIVERY_PHASE:
+        baseModule.properties = { selectedPhase: 'Assess' };
+        break;
+      case ModuleType.KPI_CARDS:
+        baseModule.properties = { 
+          metrics: [
+            { value: '1.2M', label: 'Savings', color: '#00944A' },
+            { value: '+15%', label: 'Efficiency', color: '#ED8C1C' },
+            { value: 'On Track', label: 'Status', color: '#0078DC' }
+          ] 
+        };
+        break;
+      case ModuleType.TWO_COLUMN:
+        baseModule.properties = { 
+          col1Type: 'image',
+          col1ImageUrl: 'https://picsum.photos/300/200',
+          col2Type: 'text',
+          col2Text: 'Add your two-column text here. This layout works great for highlighting specific features or updates.'
+        };
+        break;
+      case ModuleType.CHECKLIST:
+        baseModule.properties = { 
+          checklistItems: [
+            { text: 'Completed task', icon: 'checked' },
+            { text: 'Pending item', icon: 'empty' },
+            { text: 'Important note', icon: 'blue' }
+          ]
+        };
+        break;
+      case ModuleType.LEGAL:
+        baseModule.properties = {
+          chairman: 'Michael Lewis',
+          board: 'Dr. Carsten Poppinga (Vorsitzender/Chairman), Dr. Thomas Linßen'
+        };
+        baseModule.section = 'outside';
+        break;
+    }
+    
+    setModules(prev => {
+      const lastInsideIndex = prev.reduce((last, m, i) => m.section === 'inside' ? i : last, -1);
+      const newModules = [...prev];
+      if (baseModule.section === 'inside') {
+        newModules.splice(lastInsideIndex + 1, 0, baseModule as ModuleData);
+      } else {
+        newModules.push(baseModule as ModuleData);
+      }
+      return newModules;
+    });
+    setSelectedModuleId(id);
+    setCollapsedIds(prev => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+  };
+
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(exportHtml);
+    setCopySuccess(true);
+    setTimeout(() => setCopySuccess(false), 2000);
+  };
+
+  const insideModules = modules.filter(m => m.section === 'inside');
+  const outsideModules = modules.filter(m => m.section === 'outside');
+  const activeTemplate = templates.find(t => t.id === currentTemplateId);
+  const isAnyExpanded = modules.some(m => !collapsedIds.has(m.id));
+
+  const renderCodeSegments = () => {
+    const lines = exportHtml.split('\n');
+    let currentModuleId: string | null = null;
+    const segments: { id: string | null, lines: string[] }[] = [];
+    let activeLines: string[] = [];
+
+    lines.forEach(line => {
+      // Robust regex to find the START/END markers from utils.ts
+      const startMatch = line.match(/<!-- START_ID:([^ ]+) -->/);
+      const endMatch = line.match(/<!-- END_ID:([^ ]+) -->/);
+
+      if (startMatch) {
+        if (activeLines.length > 0) {
+          segments.push({ id: currentModuleId, lines: [...activeLines] });
+        }
+        currentModuleId = startMatch[1];
+        activeLines = [line];
+      } else if (endMatch) {
+        activeLines.push(line);
+        segments.push({ id: currentModuleId, lines: [...activeLines] });
+        currentModuleId = null;
+        activeLines = [];
+      } else {
+        activeLines.push(line);
+      }
+    });
+
+    if (activeLines.length > 0) {
+      segments.push({ id: currentModuleId, lines: activeLines });
+    }
+
+    let lineCounter = 1;
+    return (
+      <div className="font-mono text-[13px] leading-relaxed relative">
+        {segments.map((seg, sIdx) => {
+          const isSelected = seg.id === selectedModuleId;
+          return (
+            <div 
+              key={sIdx} 
+              id={seg.id ? `code-block-${seg.id}` : undefined}
+              className={`transition-colors duration-300 ${isSelected ? 'bg-blue-500/20 ring-1 ring-blue-400/30' : ''}`}
+            >
+              {seg.lines.map((line, lIdx) => (
+                <div key={lIdx} className="flex group hover:bg-white/5">
+                  <div className="w-12 shrink-0 text-right pr-4 text-slate-500 select-none opacity-40 border-r border-slate-800 mr-4">
+                    {lineCounter++}
+                  </div>
+                  <div className="flex-1 pr-4 whitespace-pre-wrap">
+                    {line || ' '}
+                  </div>
+                </div>
+              ))}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  return (
+    <div className="flex h-screen bg-slate-50 overflow-hidden text-slate-900">
+      {/* Save Template Modal */}
+      {isSaveModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all border border-slate-200">
+            <div className="p-6">
+              <h3 className="text-lg font-bold text-slate-800 mb-2">Save Template</h3>
+              <p className="text-xs text-slate-500 mb-4">Templates are synced to SharePoint via Power Automate.</p>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Template Name</label>
+                  <input 
+                    type="text" 
+                    value={saveModalName} 
+                    onChange={(e) => setSaveModalName(e.target.value)}
+                    placeholder="e.g. Monthly Status Update"
+                    className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 transition-all bg-white"
+                    autoFocus
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="p-4 bg-slate-50 flex flex-col gap-2">
+              <div className="grid grid-cols-2 gap-2">
+                 <button 
+                  onClick={() => handleSaveConfirm(true)}
+                  disabled={isSyncing || !saveModalName.trim() || !currentTemplateId || activeTemplate?.name === 'Demo'}
+                  className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-2.5 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm"
+                >
+                  {isSyncing ? 'SYNCING...' : 'UPDATE'}
+                </button>
+                <button 
+                  onClick={() => handleSaveConfirm(false)}
+                  disabled={isSyncing || !saveModalName.trim()}
+                  className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold py-2.5 rounded-lg disabled:opacity-50 transition-all shadow-sm"
+                >
+                  {isSyncing ? 'SYNCING...' : 'SAVE NEW'}
+                </button>
+              </div>
+              <button 
+                onClick={() => setIsSaveModalOpen(false)}
+                className="w-full text-xs font-bold text-slate-500 hover:text-slate-700 py-2 transition-colors"
+              >
+                CANCEL
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Sidebar */}
+      <div className="w-96 border-r border-slate-200 flex flex-col h-full bg-white shadow-xl z-10">
+        <div className="h-14 px-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+          <div className="flex items-center gap-3">
+            <img src="https://raw.githubusercontent.com/Uniper-Bulawa/dot-email-assets/main/DOT_small_bm.png" className="h-[20px] w-auto object-contain" alt="DOT Logo" />
+            <div className="h-5 w-px bg-slate-200"></div>
+            <h1 className="font-bold text-slate-800 text-sm whitespace-nowrap leading-none">Email Builder</h1>
+          </div>
+          
+          <div className="flex gap-1.5 items-center">
+             <div
+               className="relative p-2 -m-2"
+               ref={templatePanelRef}
+               onMouseEnter={() => !isTemplatePanelPinned && setIsTemplatePanelOpen(true)}
+               onMouseLeave={() => !isTemplatePanelPinned && setIsTemplatePanelOpen(false)}
+             >
+                <button 
+                  onClick={() => setIsTemplatePanelPinned(prev => !prev)}
+                  className={`p-2 rounded-lg transition-all relative ${isTemplatePanelOpen ? 'bg-blue-100 text-blue-600' : 'text-slate-400 hover:bg-slate-100'}`}
+                  title="Templates"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                  </svg>
+                  {isSyncing && (
+                    <span className="absolute top-1 right-1 w-2 h-2 bg-blue-500 rounded-full animate-ping"></span>
+                  )}
+                </button>
+                
+                {(isTemplatePanelOpen || isTemplatePanelPinned) && (
+                  <div className="absolute left-0 mt-2 w-72 bg-white border border-slate-200 rounded-xl shadow-2xl z-[60] overflow-hidden">
+                    <div className="px-4 py-3 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
+                      <a 
+                        href="https://uniper.sharepoint.com/sites/DOT/Lists/EmailBuilder%20Templates/AllItems.aspx" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-[10px] font-black text-slate-500 uppercase tracking-widest truncate max-w-[100px] hover:text-blue-600 transition-colors flex items-center gap-1"
+                        title="Open SharePoint List"
+                      >
+                        SP Templates
+                        <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                      </a>
+                      <div className="flex gap-1.5">
+                        <button 
+                          onClick={() => { openSaveModal(); }} 
+                          className="bg-slate-800 hover:bg-slate-700 text-white text-[9px] font-bold px-2 py-1 rounded shadow-sm transition-colors"
+                        >
+                          SAVE
+                        </button>
+                        <button 
+                          onClick={syncWithServer} 
+                          className={`bg-blue-600 hover:bg-blue-700 text-white text-[9px] font-bold px-2 py-1 rounded shadow-sm transition-colors ${isSyncing ? 'animate-pulse' : ''}`}
+                        >
+                          {isSyncing ? 'SYNCING...' : 'REFRESH'}
+                        </button>
+                      </div>
+                    </div>
+                    {syncError && (
+                      <div className="px-4 py-3 bg-red-50 text-[10px] text-red-600 font-bold border-b border-red-100 leading-relaxed shadow-inner">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                          CONNECTION ERROR
+                        </div>
+                        <p className="font-normal opacity-80">{syncError}</p>
+                      </div>
+                    )}
+                    <div className="max-h-64 overflow-y-auto custom-scrollbar py-1">
+                      {templates.length === 1 ? ( 
+                        <div className="px-4 py-6 text-center text-[10px] text-slate-400 italic">No SP templates found</div>
+                      ) : (
+                        <>
+                          {!hasRefreshed && (
+                            <div className="px-4 py-2 text-[9px] text-slate-400 italic border-b border-slate-100 bg-slate-50/50">
+                              Templates from SharePoint are loaded on refresh.
+                            </div>
+                          )}
+                          {templates.map(t => (
+
+                          <div className={`group flex items-center justify-between px-4 py-2 hover:bg-blue-50 transition-colors ${currentTemplateId === t.id ? 'bg-blue-50/50' : ''}`}>
+                          <button 
+                            onClick={() => loadTemplate(t.id)}
+                            className={`flex-1 text-left text-xs font-medium truncate ${currentTemplateId === t.id ? 'text-blue-600 font-bold' : 'text-slate-600'}`}
+                          >
+                            {t.name}
+                          </button>
+                        </div>
+
+                      ))}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
+             </div>
+
+             <div
+               className="relative"
+               ref={addPanelRef}
+               onMouseEnter={() => !isAddPanelPinned && setIsAddPanelOpen(true)}
+               onMouseLeave={() => !isAddPanelPinned && setIsAddPanelOpen(false)}
+             >
+                <button
+                  onClick={() => setIsAddPanelPinned(prev => !prev)}
+                  className="bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold px-3 py-2 rounded-lg flex items-center gap-1 transition-all shadow-sm"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg>
+                  ADD
+                </button>
+                <div className={`absolute right-0 mt-2 w-52 bg-white border border-slate-200 rounded-lg shadow-2xl transition-all z-50 ${isAddPanelOpen || isAddPanelPinned ? 'opacity-100 visible' : 'opacity-0 invisible'}`}>
+                  <div className="py-1 overflow-y-auto custom-scrollbar">
+                    {Object.values(ModuleType)
+                      .sort((a, b) => a.replace(/_/g, ' ').localeCompare(b.replace(/_/g, ' ')))
+                      .map(type => (
+                        <button key={type} onClick={() => addModule(type)} className="w-full text-left px-4 py-2 text-xs text-slate-600 hover:bg-blue-50 hover:text-blue-700 transition-colors border-b border-slate-50 last:border-0">
+                          {type.replace(/_/g, ' ')}
+                        </button>
+                      ))}
+                  </div>
+                </div>
+             </div>
+          </div>
+        </div>
+
+        {/* Template Status Bar */}
+        <div className="px-4 py-2 bg-slate-50/50 border-b border-slate-100 flex justify-between items-center shrink-0">
+           <div className="flex items-center gap-2 overflow-hidden">
+              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">Template:</span>
+              <span className="text-[10px] font-bold text-blue-700 truncate">{activeTemplate?.name || 'Unsaved Layout'}</span>
+              {isSyncing && <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse shrink-0"></span>}
+           </div>
+           <button 
+             onClick={toggleAllCollapse}
+             className="text-[9px] font-bold text-slate-500 hover:text-blue-600 flex items-center gap-1.5 transition-colors uppercase"
+           >
+             <svg className={`w-3 h-3 transition-transform ${isAnyExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 13l-7 7-7-7M19 5l-7 7-7-7" />
+             </svg>
+             {isAnyExpanded ? 'COLLAPSE ALL' : 'EXPAND ALL'}
+           </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-4 custom-scrollbar bg-slate-50/30">
+          <div className="mb-8">
+            <h3 className="text-[10px] font-black text-slate-400 mb-3 ml-2 tracking-widest uppercase flex items-center gap-2">
+              <span className="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
+              Main Body
+            </h3>
+            {insideModules.length > 0 ? insideModules.map(module => (
+              <ModuleItemEditor 
+                key={module.id} 
+                module={module} 
+                isSelected={selectedModuleId === module.id}
+                isCollapsed={collapsedIds.has(module.id)}
+                onToggleCollapse={toggleModuleCollapse}
+                onSelect={setSelectedModuleId}
+                onChange={updateModule}
+                onRemove={removeModule}
+                onDuplicate={duplicateModule}
+                onMoveUp={(id) => moveModule(id, 'up')}
+                onMoveDown={(id) => moveModule(id, 'down')}
+              />
+            )) : (
+              <div className="text-[10px] text-slate-400 italic ml-2 mb-4">No modules inside main body</div>
+            )}
+          </div>
+
+          <div className="mb-8">
+            <h3 className="text-[10px] font-black text-slate-400 mb-3 ml-2 tracking-widest uppercase flex items-center gap-2">
+              <span className="w-1.5 h-1.5 bg-slate-300 rounded-full"></span>
+              Outside Body
+            </h3>
+            {outsideModules.length > 0 ? outsideModules.map(module => (
+              <ModuleItemEditor 
+                key={module.id} 
+                module={module} 
+                isSelected={selectedModuleId === module.id}
+                isCollapsed={collapsedIds.has(module.id)}
+                onToggleCollapse={toggleModuleCollapse}
+                onSelect={setSelectedModuleId}
+                onChange={updateModule}
+                onRemove={removeModule}
+                onDuplicate={duplicateModule}
+                onMoveUp={(id) => moveModule(id, 'up')}
+                onMoveDown={(id) => moveModule(id, 'down')}
+              />
+            )) : (
+              <div className="text-[10px] text-slate-400 italic ml-2">No modules outside main body</div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Main Area */}
+      <div className="flex-1 flex flex-col bg-slate-100 overflow-hidden">
+        <div className="h-14 border-b border-slate-200 bg-white flex items-center justify-between px-6 shadow-sm">
+          <div className="flex items-center">
+            <div className="flex bg-slate-100 p-1 rounded-lg">
+              <button onClick={() => setActiveTab('preview')} className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${activeTab === 'preview' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>Preview</button>
+              <button onClick={() => setActiveTab('code')} className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${activeTab === 'code' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>HTML</button>
+            </div>
+            
+            {activeTab === 'preview' && (
+              <div className="flex items-center gap-3 ml-4 pl-4 border-l border-slate-200">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Mode</span>
+                <div className="flex bg-slate-100 p-1 rounded-lg">
+                  <button 
+                    onClick={() => setIsPreviewDarkMode(false)} 
+                    className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${!isPreviewDarkMode ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
+                  >
+                    LIGHT
+                  </button>
+                  <button 
+                    onClick={() => setIsPreviewDarkMode(true)} 
+                    className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${isPreviewDarkMode ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
+                  >
+                    DARK
+                  </button>
+                </div>
+              </div>
+            )}
+            
+            {isSyncing && (
+              <div className="ml-4 flex items-center gap-2 text-[10px] font-bold text-blue-500 animate-pulse uppercase tracking-widest">
+                <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                Syncing...
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center gap-3">
+             <button onClick={copyToClipboard} className={`flex items-center gap-2 text-xs font-bold px-4 py-2 rounded-lg transition-all ${copySuccess ? 'bg-green-100 text-green-700' : 'bg-slate-900 text-white hover:bg-slate-800 shadow-md active:scale-95'}`}>
+               {copySuccess ? 'Copied!' : 'Copy Code'}
+             </button>
+          </div>
+        </div>
+        <div 
+          className="flex-1 overflow-auto p-8 flex justify-center items-start relative bg-[#f8fafc]"
+          style={{
+            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23cbd5e1' fill-opacity='0.15'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+            backgroundRepeat: 'repeat'
+          }}
+        >
+          {activeTab === 'preview' ? (
+            <div className="w-full max-w-[1000px] bg-white rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.08)] overflow-hidden border border-slate-200">
+              <iframe 
+                ref={previewIframeRef}
+                srcDoc={previewHtml} 
+                className="w-full h-[calc(100vh-160px)] border-none" 
+                title="Email Preview" 
+                sandbox="allow-scripts allow-same-origin"
+              />
+            </div>
+          ) : (
+            <div className="w-full max-w-[1000px] h-full" ref={codeContainerRef}>
+              <div className="bg-slate-900 text-blue-300 p-6 rounded-xl overflow-auto text-sm font-mono h-[calc(100vh-160px)] shadow-[0_0_60px_-15px_rgba(0,0,0,0.5)] border border-slate-800 scroll-smooth custom-scrollbar">
+                {renderCodeSegments()}
+              </div>
+            </div>
+          )}
+          <div className="absolute bottom-4 right-6 text-[10px] font-bold text-slate-400 pointer-events-none select-none uppercase tracking-widest opacity-50">
+            {APP_VERSION}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default App;
